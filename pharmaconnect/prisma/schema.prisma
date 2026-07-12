@@ -45,7 +45,7 @@ model Pharmacy {
   phone         String
   latitude      Float
   longitude     Float
-  licenseNumber String
+  licenseNumber String?
 
   stocks   PharmacyStock[]
   requests Request[]       @relation("PharmacyRequests")

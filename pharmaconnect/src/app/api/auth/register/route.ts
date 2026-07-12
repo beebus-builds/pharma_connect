@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
             phone: data.phone!,
             latitude: data.latitude!,
             longitude: data.longitude!,
-            licenseNumber: data.licenseNumber!,
+            licenseNumber: data.licenseNumber ?? null,
           },
         } : undefined,
       },

@@ -29,9 +29,6 @@ export const registerSchema = z.object({
     if (data.longitude === undefined || Number.isNaN(data.longitude)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["longitude"], message: "Longitude is required" });
     }
-    if (!data.licenseNumber || data.licenseNumber.trim().length < 2) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["licenseNumber"], message: "License number is required" });
-    }
   }
 });
 
