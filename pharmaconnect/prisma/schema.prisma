@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  PATIENT
+  PHARMACY
+  ADMIN
+}
+
+enum RequestStatus {
+  PENDING
+  AVAILABLE
+  UNAVAILABLE
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(PATIENT)
+  emailVerified Boolean @default(false)
+  verificationToken String?
+  createdAt DateTime @default(now())
+
+  pharmacy Pharmacy?
+  requests Request[] @relation("PatientRequests")
+
+  @@index([email])
+}
+
+model Pharmacy {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  address       String
+  phone         String
+  latitude      Float
+  longitude     Float
+  licenseNumber String
+
+  stocks   PharmacyStock[]
+  requests Request[]       @relation("PharmacyRequests")
+
+  createdAt DateTime @default(now())
+
+  @@index([latitude, longitude])
+  @@index([name])
+}
+
+model Medicine {
+  id           String @id @default(cuid())
+  genericName  String
+  brandName    String
+  strength     String
+  manufacturer String
+
+  stocks   PharmacyStock[]
+  requests Request[]
+
+  @@index([genericName])
+  @@index([brandName])
+}
+
+model PharmacyStock {
+  id         String   @id @default(cuid())
+  pharmacyId String
+  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  medicineId String
+  medicine   Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  quantity   Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([pharmacyId, medicineId])
+  @@index([medicineId])
+  @@index([pharmacyId])
+}
+
+model Request {
+  id         String        @id @default(cuid())
+  patientId  String
+  patient    User          @relation("PatientRequests", fields: [patientId], references: [id], onDelete: Cascade)
+  pharmacyId String
+  pharmacy   Pharmacy      @relation("PharmacyRequests", fields: [pharmacyId], references: [id], onDelete: Cascade)
+  medicineId String
+  medicine   Medicine      @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  status     RequestStatus @default(PENDING)
+  createdAt  DateTime      @default(now())
+
+  @@index([patientId])
+  @@index([pharmacyId])
+  @@index([status])
+}
