@@ -16,7 +16,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (status === "authenticated" && session?.user.role !== "ADMIN") {
+    } else if (status === "authenticated" && (session?.user.role as string) !== "ADMIN") {
       router.push("/");
     }
   }, [status, router, session]);
@@ -31,7 +31,7 @@ export default function AdminDashboard() {
         console.error("Failed to fetch stats", e);
       }
     }
-    if (session?.user.role === "ADMIN") fetchStats();
+    if ((session?.user.role as string) === "ADMIN") fetchStats();
   }, [session]);
 
   if (status === "loading" || !session) {
