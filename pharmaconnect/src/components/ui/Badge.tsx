@@ -30,11 +30,11 @@ export function DistanceBadge({ km }: { km: number }) {
   );
 }
 
-export function StatusBadge({ status }: { status: "PENDING" | "AVAILABLE" | "UNAVAILABLE" }) {
+export function StatusBadge({ status, label }: { status: "PENDING" | "AVAILABLE" | "UNAVAILABLE"; label?: string }) {
   const styles: Record<string, string> = {
     PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
     AVAILABLE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
     UNAVAILABLE: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
   };
-  return <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full", styles[status])}>{status}</span>;
+  return <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full", styles[status])}>{label || status}</span>;
 }

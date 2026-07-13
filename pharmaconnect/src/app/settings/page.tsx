@@ -22,7 +22,7 @@ export default function SettingsPage() {
       router.push("/login");
     }
     if (session?.user) {
-      setName(session.user.name);
+      setName(session.user.name ?? "");
     }
   }, [status, router, session]);
 
