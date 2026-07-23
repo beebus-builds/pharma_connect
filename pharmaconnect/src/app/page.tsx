@@ -95,81 +95,43 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col gap-24 pb-20 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
-      {/* 1. Hero Section - Redesigned for High Impact */}
-      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-primary-700 text-white">
-        {/* Dynamic Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-400/30 rounded-full blur-[120px] animate-pulse"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/30 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-20" 
-               style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
-        </div>
-
-        <div className="max-w-6xl mx-auto px-4 text-center relative z-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full text-xs font-semibold mb-8 backdrop-blur-md border border-white/20 shadow-sm"
-          >
-            <Stethoscope className="h-3.5 w-3.5" /> Nepal's Trusted Medicine Network
-          </motion.div>
-          
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-5xl sm:text-7xl font-black mb-8 tracking-tight leading-[1.1]"
-          >
-            Find Your Medicine <br />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary-200 to-blue-200">
-              In Seconds, Not Hours
-            </span>
-          </motion.h1>
-
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="text-primary-100 text-lg sm:text-xl max-w-2xl mx-auto mb-12 leading-relaxed opacity-90"
-          >
-            Stop the endless search. Get real-time stock availability from nearby pharmacies across Nepal.
-          </motion.p>
-          
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-            className="max-w-2xl mx-auto relative group"
-          >
-            <div className="absolute -inset-1 bg-gradient-to-r from-white/40 to-blue-400/40 rounded-2xl blur-xl group-hover:blur-2xl transition duration-500"></div>
-            <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-2">
-              <SearchBar onSelect={setMedicine} onClear={() => setMedicine(null)} selected={medicine} />
+      {/* 1. Hero Section - Conditional for Personalized Experience */}
+      <section className="relative pt-24 pb-12 bg-slate-900 text-white">
+        <div className="max-w-6xl mx-auto px-4">
+          {session ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+              <h1 className="text-4xl font-black">Welcome back, {session.user.name || "Patient"}</h1>
+              <p className="text-slate-400">Manage your medicine requests and check your saved pharmacies.</p>
+              <div className="flex gap-4 pt-4">
+                <Button className="rounded-full">View My Requests</Button>
+                <Button variant="outline" className="rounded-full">Saved Pharmacies</Button>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="text-center">
+              <h1 className="text-5xl sm:text-7xl font-black mb-8">Find Your Medicine</h1>
+              <p className="text-primary-100 text-lg max-w-2xl mx-auto">Get real-time stock availability.</p>
             </div>
-          </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1, delay: 1 }}
-            className="mt-8 flex items-center justify-center gap-3 text-sm text-primary-100 font-medium"
-          >
-            <div className="flex items-center gap-1 text-primary-200 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
-              <MapPin className="h-4 w-4" />
-              {location ? (
-                <span>📍 Your current location active</span>
-              ) : (
-                <button
-                  onClick={requestLocation}
-                  className="underline hover:text-white transition"
-                >
-                  {locLoading ? "Detecting..." : "Enable location for better results"}
-                </button>
-              )}
-            </div>
-          </motion.div>
+          )}
+          
+          <div className="mt-12 max-w-2xl">
+            <SearchBar onSelect={setMedicine} onClear={() => setMedicine(null)} selected={medicine} />
+          </div>
         </div>
       </section>
+
+      {/* 1.5 Personalized Feed (Authenticated) */}
+      {session && (
+        <section className="max-w-6xl mx-auto px-4 -mt-8 relative z-20">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl flex items-center gap-4">
+            <h3 className="font-bold text-slate-900 dark:text-white">Recent Searches:</h3>
+            <div className="flex gap-2">
+              <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-sm">Amoxicillin</span>
+              <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-sm">Paracetamol</span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 2. Quick Stats - Redesigned as a "Trust Bar" */}
       <section className="max-w-6xl mx-auto px-4 w-full -mt-12 relative z-20">
@@ -549,55 +511,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* 10. Footer - Brand Centric */}
-      <footer className="bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pt-20 pb-10">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20">
-            <div className="col-span-1 md:col-span-2">
-              <Link href="/" className="flex items-center gap-2 font-black text-2xl text-primary-700 dark:text-primary-400 mb-6">
-                <Stethoscope className="h-8 w-8" />
-                PharmaConnect
-              </Link>
-              <p className="text-slate-500 max-w-sm leading-relaxed mb-8 text-lg">
-                Empowering patients and pharmacies across Nepal with real-time availability data, reducing healthcare friction, and saving precious time.
-              </p>
-              <div className="flex gap-4">
-                {[
-                  { name: "Globe", icon: Globe },
-                  { name: "MessageCircle", icon: MessageCircle },
-                  { name: "PhoneCall", icon: PhoneCall },
-                ].map(({ name, icon: Icon }) => (
-                  <div key={name} className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl cursor-pointer hover:bg-primary-600 hover:text-white transition-all duration-300 shadow-sm">
-                    <Icon className="h-6 w-6" />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h4 className="font-black text-slate-900 dark:text-white mb-6 uppercase tracking-widest text-sm">Quick Links</h4>
-              <ul className="space-y-4 text-slate-500 font-medium">
-                <li><Link href="/" className="hover:text-primary-600 transition-colors flex items-center gap-2"><ArrowRight className="h-3 w-3" /> Search Medicines</Link></li>
-                <li><Link href="/how-it-works" className="hover:text-primary-600 transition-colors flex items-center gap-2"><ArrowRight className="h-3 w-3" /> How it Works</Link></li>
-                <li><Link href="/login" className="hover:text-primary-600 transition-colors flex items-center gap-2"><ArrowRight className="h-3 w-3" /> User Login</Link></li>
-                <li><Link href="/register" className="hover:text-primary-600 transition-colors flex items-center gap-2"><ArrowRight className="h-3 w-3" /> Join as Pharmacy</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-black text-slate-900 dark:text-white mb-6 uppercase tracking-widest text-sm">Support</h4>
-              <ul className="space-y-4 text-slate-500 font-medium">
-                <li><Link href="#" className="hover:text-primary-600 transition-colors flex items-center gap-2"><ArrowRight className="h-3 w-3" /> Contact Us</Link></li>
-                <li><Link href="#" className="hover:text-primary-600 transition-colors flex items-center gap-2"><ArrowRight className="h-3 w-3" /> Privacy Policy</Link></li>
-                <li><Link href="#" className="hover:text-primary-600 transition-colors flex items-center gap-2"><ArrowRight className="h-3 w-3" /> Terms of Service</Link></li>
-                <li><Link href="#" className="hover:text-primary-600 transition-colors flex items-center gap-2"><ArrowRight className="h-3 w-3" /> FAQ</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-slate-200 dark:border-slate-800 pt-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-            © {new Date().getFullYear()} PharmaConnect Nepal. Engineered for a healthier nation.
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
+

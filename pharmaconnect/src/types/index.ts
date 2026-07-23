@@ -27,7 +27,7 @@ export interface RequestDTO {
   createdAt: string;
   patient: { id: string; name: string; email: string };
   pharmacy: { id: string; name: string };
-  medicine: { id: string; genericName: string; brandName: string };
+  medicine: MedicineDTO;
 }
 
 export interface ApiError {

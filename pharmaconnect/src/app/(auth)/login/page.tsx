@@ -7,10 +7,10 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import { Stethoscope, Mail, Lock } from "lucide-react";
 import { loginSchema, type LoginInput } from "@/lib/validations";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -46,33 +46,57 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-16">
-      <Card className="p-8">
-        <h1 className="text-2xl font-bold mb-1">Log in</h1>
-        <p className="text-sm text-slate-500 mb-6">Access your PharmaConnect account</p>
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-primary-50 dark:from-slate-950 dark:via-slate-900 dark:to-primary-950">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary-400/10 rounded-full blur-[150px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-400/10 rounded-full blur-[150px]" />
+      </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Input label="Email" type="email" placeholder="you@example.com" {...register("email")} error={errors.email?.message} />
-          <Input label="Password" type="password" placeholder="••••••••" {...register("password")} error={errors.password?.message} />
-
-          <Button type="submit" loading={isSubmitting} className="w-full">
-            Log in
-          </Button>
-        </form>
-
-        <p className="text-sm text-slate-500 mt-6 text-center">
-          Don't have an account?{" "}
-          <Link href="/register" className="text-primary-600 font-medium hover:underline">
-            Sign up
-          </Link>
-        </p>
-
-        <div className="mt-6 text-xs text-slate-400 border-t border-slate-200 dark:border-slate-700 pt-4">
-          <p className="font-medium mb-1">Demo accounts (after seeding):</p>
-          <p>Patient: patient@example.com / password123</p>
-          <p>Pharmacy: pharmacy1@example.com / password123</p>
+      <div className="relative w-full max-w-md mx-auto px-4 py-12 animate-fadeIn">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 text-white rounded-2xl shadow-lg shadow-primary-600/25 mb-4">
+            <Stethoscope className="h-8 w-8" />
+          </div>
+          <h1 className="text-3xl font-bold">Welcome back</h1>
+          <p className="text-slate-500 mt-1">Sign in to your PharmaConnect account</p>
         </div>
-      </Card>
+
+        <div className="bg-white dark:bg-slate-800/90 backdrop-blur rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 p-8">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <Input
+              label="Email"
+              type="email"
+              placeholder="you@example.com"
+              {...register("email")}
+              error={errors.email?.message}
+            />
+            <Input
+              label="Password"
+              type="password"
+              placeholder=""
+              {...register("password")}
+              error={errors.password?.message}
+            />
+
+            <Button type="submit" loading={isSubmitting} className="w-full">
+              Sign in
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center text-sm text-slate-500">
+            Don&apos;t have an account?{" "}
+            <Link href="/register" className="text-primary-600 font-semibold hover:text-primary-700 transition-colors">
+              Create one
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-6 text-center">
+          <Link href="/" className="text-xs text-slate-400 hover:text-slate-500 transition-colors">
+            Back to homepage
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
