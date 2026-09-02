@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from "react-leaflet";
 import L from "leaflet";
+import { useTheme } from "@/components/ThemeProvider";
 import type { NearbyPharmacyDTO } from "@/types";
 
 // Custom professional marker for pharmacies
@@ -32,14 +33,37 @@ const userIcon = new L.DivIcon({
   iconAnchor: [8, 8],
 });
 
-function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
+function FitBounds({
+  userLocation,
+  pharmacies,
+}: {
+  userLocation: { lat: number; lng: number } | null;
+  pharmacies: NearbyPharmacyDTO[];
+}) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo([lat, lng], map.getZoom(), {
-      duration: 1.5,
-      easeLinearity: 0.25,
-    });
-  }, [lat, lng, map]);
+    if (!userLocation && pharmacies.length === 0) return;
+
+    // If only user location and no pharmacies, fly to user
+    if (pharmacies.length === 0 && userLocation) {
+      map.flyTo([userLocation.lat, userLocation.lng], 14, { duration: 1.2 });
+      return;
+    }
+
+    // Build bounds from all points
+    const bounds = L.latLngBounds([]);
+    if (userLocation) bounds.extend([userLocation.lat, userLocation.lng]);
+    pharmacies.forEach((p) => bounds.extend([p.latitude, p.longitude]));
+
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, {
+        padding: [40, 40],
+        maxZoom: 15,
+        animate: true,
+        duration: 1.2,
+      });
+    }
+  }, [userLocation, pharmacies, map]);
   return null;
 }
 
@@ -49,51 +73,57 @@ interface MapViewProps {
 }
 
 export default function MapView({ userLocation, pharmacies }: MapViewProps) {
+  const { theme } = useTheme();
   const center: [number, number] = userLocation
     ? [userLocation.lat, userLocation.lng]
     : [27.7041, 85.3145]; // Kathmandu fallback
 
+  const tileUrl =
+    theme === "dark"
+      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+
   return (
-    <MapContainer center={center} zoom={13} className="h-full w-full" scrollWheelZoom>
-      <TileLayer
-        attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-      />
+    <MapContainer center={center} zoom={13} className="h-full w-full" scrollWheelZoom zoomControl={false}>
+      <TileLayer attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>' url={tileUrl} />
+      <ZoomControl position="bottomright" />
+      <FitBounds userLocation={userLocation} pharmacies={pharmacies} />
 
       {userLocation && (
-        <>
-          <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon}>
-            <Popup className="custom-popup">
-              <div className="text-sm font-medium text-slate-900">Your Current Location</div>
-            </Popup>
-          </Marker>
-          <RecenterMap lat={userLocation.lat} lng={userLocation.lng} />
-        </>
+        <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} alt="Your location">
+          <Popup className="custom-popup">
+            <div className="text-sm font-medium text-slate-900">Your Current Location</div>
+            <p className="text-xs text-slate-500">{userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}</p>
+          </Popup>
+        </Marker>
       )}
 
       {pharmacies.map((p) => (
-        <Marker key={p.id} position={[p.latitude, p.longitude]} icon={pharmacyIcon}>
-          <Popup className="custom-popup">
-            <div className="p-1 max-w-[200px]">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-1 bg-primary-100 text-primary-600 rounded-md">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <Marker key={p.id} position={[p.latitude, p.longitude]} icon={pharmacyIcon} alt={p.name}>
+          <Popup className="custom-popup" maxWidth={240}>
+            <div className="p-1 min-w-[200px]">
+              <div className="flex items-start gap-2 mb-2">
+                <div className="p-1.5 bg-primary-100 text-primary-600 rounded-lg shrink-0 mt-0.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 </div>
-                <p className="font-bold text-slate-900 leading-tight">{p.name}</p>
+                <div className="min-w-0">
+                  <p className="font-bold text-slate-900 leading-tight text-sm">{p.name}</p>
+                  <p className="text-xs text-slate-500 line-clamp-2">{p.address}</p>
+                </div>
               </div>
-              <div className="space-y-1.5 text-xs text-slate-600">
-                <p className="flex items-start gap-1">
-                  <span className="opacity-60">📍</span> {p.address}
+              <div className="space-y-1 text-xs text-slate-600">
+                <p className="flex items-center gap-1.5">
+                  <span className="opacity-60 shrink-0">📞</span>
+                  <a href={`tel:${p.phone}`} className="hover:text-primary-600 hover:underline underline-offset-2">
+                    {p.phone}
+                  </a>
                 </p>
-                <p className="flex items-center gap-1">
-                  <span className="opacity-60">📞</span> {p.phone}
-                </p>
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <span className="font-semibold text-primary-600">
-                    {p.quantity} units
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
+                  <span className="font-semibold text-primary-600 text-xs">
+                    {p.quantity} units · {p.medicine.genericName}
                   </span>
-                  <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
-                    {p.distanceKm.toFixed(1)} km
+                  <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0">
+                    {p.distanceKm < 1 ? `${Math.round(p.distanceKm * 1000)} m` : `${p.distanceKm.toFixed(1)} km`}
                   </span>
                 </div>
               </div>
@@ -101,7 +131,7 @@ export default function MapView({ userLocation, pharmacies }: MapViewProps) {
                 href={`https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-center mt-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-semibold hover:bg-primary-700 transition-colors"
+                className="block text-center mt-3 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
               >
                 Get Directions
               </a>

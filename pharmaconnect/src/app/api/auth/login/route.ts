@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
+import { rateLimit } from "@/lib/rateLimit";
 
 /**
  * Credential-validation endpoint.
@@ -14,6 +15,9 @@ import { loginSchema } from "@/lib/validations";
  */
 export async function POST(req: NextRequest) {
   try {
+    const limited = rateLimit(req, 5, 60000);
+    if (limited) return limited;
+
     const body = await req.json();
     const parsed = loginSchema.safeParse(body);
 

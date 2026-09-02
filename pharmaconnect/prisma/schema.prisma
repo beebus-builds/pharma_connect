@@ -20,6 +20,12 @@ enum RequestStatus {
   UNAVAILABLE
 }
 
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -32,6 +38,7 @@ model User {
 
   pharmacy Pharmacy?
   requests Request[] @relation("PatientRequests")
+  messages Message[]
 
   @@index([email])
 }
@@ -49,11 +56,31 @@ model Pharmacy {
 
   stocks   PharmacyStock[]
   requests Request[]       @relation("PharmacyRequests")
+  payments Payment[]
+
+  subscriptionActive    Boolean   @default(false)
+  subscriptionExpiresAt DateTime?
 
   createdAt DateTime @default(now())
 
   @@index([latitude, longitude])
   @@index([name])
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  pharmacyId String
+  pharmacy   Pharmacy      @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  purpose    String        @default("SUBSCRIPTION")
+  amount     Int
+  status     PaymentStatus @default(PENDING)
+  pidx       String?       @unique
+  transactionId String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([pharmacyId])
+  @@index([status])
 }
 
 model Medicine {
@@ -94,8 +121,38 @@ model Request {
   medicine   Medicine      @relation(fields: [medicineId], references: [id], onDelete: Cascade)
   status     RequestStatus @default(PENDING)
   createdAt  DateTime      @default(now())
+  conversation Conversation?
 
   @@index([patientId])
   @@index([pharmacyId])
   @@index([status])
+}
+
+model Conversation {
+  id         String   @id @default(cuid())
+  requestId  String   @unique
+  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  patientId  String
+  pharmacyId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  messages   Message[]
+
+  @@index([patientId])
+  @@index([pharmacyId])
+  @@index([updatedAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String       @db.VarChar(2000)
+  createdAt      DateTime     @default(now())
+  readAt         DateTime?
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
 }

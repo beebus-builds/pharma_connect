@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { medicineSearchSchema } from "@/lib/validations";
+import { rateLimit } from "@/lib/rateLimit";
 
 export async function GET(req: NextRequest) {
   try {
+    const limited = rateLimit(req, 30, 60000);
+    if (limited) return limited;
+
     const { searchParams } = new URL(req.url);
     const parsed = medicineSearchSchema.safeParse({ q: searchParams.get("q") ?? "" });
 

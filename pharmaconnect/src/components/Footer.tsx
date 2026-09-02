@@ -78,9 +78,9 @@ export default function Footer() {
         <div className="border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
           <p>© {new Date().getFullYear()} PharmaConnect Nepal. Engineered for a healthier nation.</p>
           <div className="flex gap-6">
-            <Link href="#" className="hover:text-slate-600 transition-colors">Privacy Policy</Link>
-            <Link href="#" className="hover:text-slate-600 transition-colors">Terms of Service</Link>
-            <Link href="#" className="hover:text-slate-600 transition-colors">Contact</Link>
+            <Link href="/privacy" className="hover:text-slate-600 transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-slate-600 transition-colors">Terms of Service</Link>
+            <Link href="mailto:support@pharmaconnect.com.np" className="hover:text-slate-600 transition-colors">Contact</Link>
           </div>
         </div>
       </div>

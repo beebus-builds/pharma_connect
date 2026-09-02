@@ -3,10 +3,14 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/lib/validations";
 import { sendEmail } from "@/lib/mail";
+import { rateLimit } from "@/lib/rateLimit";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = rateLimit(req, 5, 60000);
+    if (limited) return limited;
+
     const body = await req.json();
     const parsed = registerSchema.safeParse(body);
 

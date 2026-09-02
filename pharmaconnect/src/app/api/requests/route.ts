@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requestCreateSchema } from "@/lib/validations";
+import { rateLimit } from "@/lib/rateLimit";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -35,6 +36,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = rateLimit(req, 20, 60000);
+    if (limited) return limited;
+
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "PATIENT") {
       return NextResponse.json({ error: "Only patients can create requests" }, { status: 403 });

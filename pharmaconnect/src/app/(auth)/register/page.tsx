@@ -7,7 +7,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Stethoscope, LocateFixed, UserRound, Building2, Check } from "lucide-react";
+import { Stethoscope, LocateFixed, UserRound, Building2, Check, Eye, EyeOff } from "lucide-react";
 import { registerSchema, type RegisterInput } from "@/lib/validations";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 export default function RegisterPage() {
   const router = useRouter();
   const [role, setRole] = useState<"PATIENT" | "PHARMACY">("PATIENT");
+  const [showPassword, setShowPassword] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   const {
     register,
@@ -40,15 +42,24 @@ export default function RegisterPage() {
       toast.error("Geolocation is not supported by your browser");
       return;
     }
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setValue("latitude", pos.coords.latitude);
-        setValue("longitude", pos.coords.longitude);
+        setValue("latitude", pos.coords.latitude, { shouldValidate: true });
+        setValue("longitude", pos.coords.longitude, { shouldValidate: true });
         toast.success("Location captured");
+        setLocating(false);
       },
-      () => toast.error("Could not detect location. Enter coordinates manually.")
+      () => {
+        toast.error("Could not detect location. Enter coordinates manually.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   }
+
+  const passwordValue = watch("password") || "";
+  const passwordStrength = passwordValue.length === 0 ? 0 : passwordValue.length < 6 ? 1 : passwordValue.length < 10 ? 2 : 3;
 
   const onSubmit = async (values: RegisterInput) => {
     try {
@@ -117,9 +128,44 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <input type="hidden" {...register("role")} value={currentRole} />
 
-            <Input label="Full name" placeholder="Ram Sharma" {...register("name")} error={errors.name?.message} />
-            <Input label="Email" type="email" placeholder="you@example.com" {...register("email")} error={errors.email?.message} />
-            <Input label="Password" type="password" placeholder="At least 6 characters" {...register("password")} error={errors.password?.message} />
+            <Input label="Full name" placeholder="Ram Sharma" autoComplete="name" {...register("name")} error={errors.name?.message} />
+            <Input label="Email" type="email" placeholder="you@example.com" autoComplete="email" {...register("email")} error={errors.email?.message} />
+            <div className="space-y-1.5">
+              <div className="relative">
+                <Input
+                  label="Password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="At least 6 characters"
+                  autoComplete="new-password"
+                  {...register("password")}
+                  error={errors.password?.message}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-[2.1rem] p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {passwordValue && (
+                <div className="flex gap-1" aria-hidden="true">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full transition-colors ${i <= passwordStrength ? (passwordStrength === 1 ? "bg-red-500" : passwordStrength === 2 ? "bg-amber-500" : "bg-emerald-500") : "bg-slate-200 dark:bg-slate-700"}`}
+                    />
+                  ))}
+                </div>
+              )}
+              {passwordValue && (
+                <p className="text-xs text-slate-500">
+                  {passwordStrength === 1 ? "Weak — use 6+ characters" : passwordStrength === 2 ? "Medium — add numbers & symbols" : "Strong password"}
+                </p>
+              )}
+            </div>
 
             <AnimatePresence mode="wait">
               {currentRole === "PHARMACY" && (
@@ -144,10 +190,11 @@ export default function RegisterPage() {
                           <Input type="number" step="any" placeholder="Latitude" {...register("latitude")} error={errors.latitude?.message} />
                           <Input type="number" step="any" placeholder="Longitude" {...register("longitude")} error={errors.longitude?.message} />
                         </div>
-                        <Button type="button" variant="secondary" onClick={detectLocation} className="mt-2 w-full text-xs">
+                        <Button type="button" variant="secondary" onClick={detectLocation} loading={locating} className="mt-2 w-full text-xs">
                           <LocateFixed className="h-4 w-4" />
-                          Use my current location
+                          {locating ? "Detecting…" : "Use my current location"}
                         </Button>
+                        <p className="text-[11px] text-slate-400 mt-1">We’ll fill latitude & longitude automatically. You can edit them.</p>
                       </div>
                     </div>
                   </div>

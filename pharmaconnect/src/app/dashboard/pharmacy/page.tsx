@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
-import { Plus, PackageCheck, Pill, ClipboardList, CheckCircle2, XCircle, AlertTriangle, TrendingUp } from "lucide-react";
+import { Plus, PackageCheck, Pill, ClipboardList, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Search, Minus, MessageCircle } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -24,21 +25,42 @@ interface StockRow {
   medicine: MedicineDTO;
 }
 
+interface SubscriptionInfo {
+  active: boolean;
+  expiresAt: string | null;
+}
+
 export default function PharmacyDashboard() {
+  return (
+    <Suspense fallback={null}>
+      <PharmacyDashboardContent />
+    </Suspense>
+  );
+}
+
+function PharmacyDashboardContent() {
+  const searchParams = useSearchParams();
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [subscribing, setSubscribing] = useState(false);
   const [stocks, setStocks] = useState<StockRow[]>([]);
   const [requests, setRequests] = useState<RequestDTO[]>([]);
   const [loadingStocks, setLoadingStocks] = useState(true);
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [selectedMedicine, setSelectedMedicine] = useState<MedicineDTO | null>(null);
   const [tab, setTab] = useState<"stock" | "requests">("stock");
+  const [inventoryQuery, setInventoryQuery] = useState("");
+  const [qty, setQty] = useState<number>(10);
 
   const {
     register,
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
-  } = useForm<StockUpsertInput>({ resolver: zodResolver(stockUpsertSchema) });
+  } = useForm<StockUpsertInput>({ resolver: zodResolver(stockUpsertSchema), defaultValues: { quantity: 10 } });
+
+  const watchedQty = watch("quantity");
 
   async function loadStocks() {
     setLoadingStocks(true);
@@ -68,10 +90,45 @@ export default function PharmacyDashboard() {
     }
   }
 
+  async function loadSubscription() {
+    try {
+      const res = await fetch("/api/user/profile");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load subscription");
+      setSubscription({
+        active: !!data.user?.pharmacy?.subscriptionActive,
+        expiresAt: data.user?.pharmacy?.subscriptionExpiresAt ?? null,
+      });
+    } catch {
+      // Non-critical for page load; subscription card just won't render.
+    }
+  }
+
+  async function handleSubscribe() {
+    setSubscribing(true);
+    try {
+      const res = await fetch("/api/payments/khalti/initiate", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start payment");
+      window.location.href = data.paymentUrl;
+    } catch (e: any) {
+      toast.error(e.message || "Something went wrong");
+      setSubscribing(false);
+    }
+  }
+
   useEffect(() => {
     loadStocks();
     loadRequests();
+    loadSubscription();
   }, []);
+
+  useEffect(() => {
+    const status = searchParams.get("subscription");
+    if (status === "success") toast.success("Subscription activated!");
+    else if (status === "failed") toast.error("Payment failed. Please try again.");
+    else if (status === "pending") toast("Payment is still processing.", { icon: "⏳" });
+  }, [searchParams]);
 
   const onSubmit = async (values: StockUpsertInput) => {
     try {
@@ -83,8 +140,9 @@ export default function PharmacyDashboard() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save stock");
       toast.success("Stock updated");
-      reset();
+      reset({ quantity: 10, medicineId: "" as any });
       setSelectedMedicine(null);
+      setQty(10);
       loadStocks();
     } catch (e: any) {
       toast.error(e.message || "Something went wrong");
@@ -130,12 +188,39 @@ export default function PharmacyDashboard() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10 animate-fadeIn">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Pharmacy Dashboard</h1>
-          <p className="text-slate-500 mt-1">Inventory management and patient requests</p>
+          <p className="text-slate-500 mt-1">Inventory and realtime patient chats</p>
         </div>
+        <a href="/chat" className="self-start sm:self-auto">
+          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-sm font-semibold hover:opacity-90 transition-opacity">
+            <MessageCircle className="h-4 w-4" /> Messages
+          </span>
+        </a>
       </div>
+
+      {subscription && (
+        <Card className="mb-8 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold">
+              Subscription: {subscription.active ? (
+                <span className="text-emerald-600">Active</span>
+              ) : (
+                <span className="text-amber-600">Inactive</span>
+              )}
+            </p>
+            <p className="text-sm text-slate-500">
+              {subscription.active && subscription.expiresAt
+                ? `Renews/expires ${new Date(subscription.expiresAt).toLocaleDateString()}`
+                : "Subscribe to keep your pharmacy listed and receive patient requests."}
+            </p>
+          </div>
+          <Button onClick={handleSubscribe} disabled={subscribing} variant={subscription.active ? "outline" : "primary"}>
+            {subscribing ? "Redirecting…" : subscription.active ? "Renew (NPR 999/mo)" : "Subscribe (NPR 999/mo)"}
+          </Button>
+        </Card>
+      )}
 
       {/* Stock Health Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -224,14 +309,62 @@ export default function PharmacyDashboard() {
                 {errors.medicineId && <p className="text-xs text-red-600 mt-1">{errors.medicineId.message}</p>}
               </div>
 
-              <Input
-                label="Quantity in stock"
-                type="number"
-                min={0}
-                placeholder="e.g. 50"
-                {...register("quantity")}
-                error={errors.quantity?.message}
-              />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Quantity in stock</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = Math.max(0, (Number(watchedQty) || 0) - 1);
+                      setValue("quantity", next, { shouldValidate: true });
+                      setQty(next);
+                    }}
+                    className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
+                    aria-label="Decrease quantity"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <input
+                    type="number"
+                    min={0}
+                    {...register("quantity", { valueAsNumber: true })}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10) || 0;
+                      setQty(v);
+                    }}
+                    className="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                    placeholder="0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = (Number(watchedQty) || 0) + 1;
+                      setValue("quantity", next, { shouldValidate: true });
+                      setQty(next);
+                    }}
+                    className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
+                    aria-label="Increase quantity"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex gap-1.5 mt-2">
+                  {[5, 10, 25, 50].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => {
+                        setValue("quantity", n, { shouldValidate: true });
+                        setQty(n);
+                      }}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border ${Number(watchedQty) === n ? "bg-primary-600 text-white border-primary-600" : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100"}`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                {errors.quantity && <p className="text-xs text-red-600 mt-1">{errors.quantity.message}</p>}
+              </div>
 
               <Button type="submit" loading={isSubmitting} className="w-full">
                 <PackageCheck className="h-4 w-4" />
@@ -241,10 +374,24 @@ export default function PharmacyDashboard() {
           </Card>
 
           <div className="md:col-span-3">
-            <h2 className="font-bold mb-4 flex items-center justify-between">
-              <span>Current inventory</span>
-              <span className="text-sm font-normal text-slate-500">{stocks.length} items</span>
-            </h2>
+            <div className="mb-4 space-y-3">
+              <h2 className="font-bold flex items-center justify-between">
+                <span>Current inventory</span>
+                <span className="text-sm font-normal text-slate-500">{stocks.length} items</span>
+              </h2>
+              {stocks.length > 0 && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" aria-hidden="true" />
+                  <input
+                    value={inventoryQuery}
+                    onChange={(e) => setInventoryQuery(e.target.value)}
+                    placeholder="Filter inventory…"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                    aria-label="Filter inventory"
+                  />
+                </div>
+              )}
+            </div>
             {loadingStocks && <ListSkeleton count={4} />}
             {!loadingStocks && stocks.length === 0 && (
               <Card className="p-10 text-center border-dashed border-2 border-slate-200 dark:border-slate-700">
@@ -253,35 +400,89 @@ export default function PharmacyDashboard() {
                 <p className="text-xs text-slate-400 mt-1">Use the form to add your first item.</p>
               </Card>
             )}
-            {!loadingStocks && stocks.length > 0 && (
-              <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-                {stocks.map((row, i) => (
-                  <Card key={row.id} className="p-4 flex items-center justify-between gap-3 hover:shadow-md transition-shadow animate-fadeIn" style={{ animationDelay: `${i * 30}ms` }}>
-                    <div className="min-w-0">
-                      <p className="font-semibold">{row.medicine.genericName}</p>
-                      <p className="text-sm text-slate-500">
-                        {row.medicine.brandName} {row.medicine.strength}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-0.5">Qty: {row.quantity}</p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <StockBadge status={stockStatus(row.quantity)} />
-                      <Button
-                        variant="secondary"
-                        className="text-xs px-2.5 py-1"
-                        onClick={() => toggleAvailability(row)}
-                      >
-                        {row.quantity > 0 ? (
-                          <XCircle className="h-3 w-3" />
-                        ) : (
-                          <CheckCircle2 className="h-3 w-3" />
-                        )}
-                      </Button>
-                    </div>
+            {!loadingStocks && stocks.length > 0 && (() => {
+              const filtered = stocks.filter((r) =>
+                inventoryQuery
+                  ? `${r.medicine.genericName} ${r.medicine.brandName} ${r.medicine.strength}`.toLowerCase().includes(inventoryQuery.toLowerCase())
+                  : true
+              );
+              if (filtered.length === 0) {
+                return (
+                  <Card className="p-8 text-center">
+                    <Search className="h-8 w-8 text-slate-300 mx-auto mb-2" aria-hidden="true" />
+                    <p className="text-sm text-slate-500">No matches for “{inventoryQuery}”</p>
+                    <button onClick={() => setInventoryQuery("")} className="text-xs font-semibold text-primary-600 hover:underline mt-1">Clear filter</button>
                   </Card>
-                ))}
-              </div>
-            )}
+                );
+              }
+              return (
+                <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                  {filtered.map((row, i) => (
+                    <Card key={row.id} className="p-4 flex items-center justify-between gap-3 hover:shadow-md transition-shadow animate-fadeIn" style={{ animationDelay: `${i * 20}ms` }}>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm">{row.medicine.genericName}</p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {row.medicine.brandName} {row.medicine.strength}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700">Qty: {row.quantity}</span>
+                          <StockBadge status={stockStatus(row.quantity)} />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={async () => {
+                              const next = Math.max(0, row.quantity - 1);
+                              await fetch("/api/pharmacies/stock", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ medicineId: row.medicine.id, quantity: next }),
+                              });
+                              loadStocks();
+                            }}
+                            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
+                            aria-label="Decrease stock"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const next = row.quantity + 1;
+                              await fetch("/api/pharmacies/stock", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ medicineId: row.medicine.id, quantity: next }),
+                              });
+                              loadStocks();
+                            }}
+                            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
+                            aria-label="Increase stock"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <Button
+                          variant={row.quantity > 0 ? "secondary" : "primary"}
+                          className="text-[11px] px-2.5 py-1 w-full"
+                          onClick={() => toggleAvailability(row)}
+                        >
+                          {row.quantity > 0 ? (
+                            <>
+                              <XCircle className="h-3 w-3" /> Out
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-3 w-3" /> In stock
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -317,8 +518,13 @@ export default function PharmacyDashboard() {
                       })}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <StatusBadge status={r.status} />
+                    <a href={`/chat/${r.id}`}>
+                      <Button variant="secondary" className="text-xs px-3 py-1.5 rounded-full">
+                        <MessageCircle className="h-3.5 w-3.5" /> Chat
+                      </Button>
+                    </a>
                     {r.status === "PENDING" && (
                       <>
                         <Button
