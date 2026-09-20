@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
           phone: s.pharmacy.phone,
           latitude: s.pharmacy.latitude,
           longitude: s.pharmacy.longitude,
+          verified: s.pharmacy.verified,
           distanceKm: Math.round(distanceKm * 100) / 100,
           quantity: s.quantity,
           stockStatus: stockStatus(s.quantity),

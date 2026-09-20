@@ -7,17 +7,17 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Stethoscope, LocateFixed, UserRound, Building2, Check, Eye, EyeOff } from "lucide-react";
+import { Stethoscope, UserRound, Building2, Check, Eye, EyeOff } from "lucide-react";
 import { registerSchema, type RegisterInput } from "@/lib/validations";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import GoogleMapPicker from "@/components/GoogleMapPicker";
 import { cn } from "@/lib/utils";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [role, setRole] = useState<"PATIENT" | "PHARMACY">("PATIENT");
   const [showPassword, setShowPassword] = useState(false);
-  const [locating, setLocating] = useState(false);
 
   const {
     register,
@@ -31,31 +31,19 @@ export default function RegisterPage() {
   });
 
   const currentRole = watch("role");
+  const watchedLat = watch("latitude");
+  const watchedLng = watch("longitude");
+  const pickedLocation =
+    typeof watchedLat === "number" &&
+    typeof watchedLng === "number" &&
+    !Number.isNaN(watchedLat) &&
+    !Number.isNaN(watchedLng)
+      ? { lat: watchedLat, lng: watchedLng }
+      : null;
 
   function selectRole(r: "PATIENT" | "PHARMACY") {
     setRole(r);
     setValue("role", r);
-  }
-
-  function detectLocation() {
-    if (!("geolocation" in navigator)) {
-      toast.error("Geolocation is not supported by your browser");
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setValue("latitude", pos.coords.latitude, { shouldValidate: true });
-        setValue("longitude", pos.coords.longitude, { shouldValidate: true });
-        toast.success("Location captured");
-        setLocating(false);
-      },
-      () => {
-        toast.error("Could not detect location. Enter coordinates manually.");
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
   }
 
   const passwordValue = watch("password") || "";
@@ -185,16 +173,14 @@ export default function RegisterPage() {
                       <Input label="Phone" placeholder="01-4223344" {...register("phone")} error={errors.phone?.message} />
                       <Input label="License number (optional)" placeholder="PH-KTM-001" {...register("licenseNumber")} error={errors.licenseNumber?.message} />
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Location coordinates</label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <Input type="number" step="any" placeholder="Latitude" {...register("latitude")} error={errors.latitude?.message} />
-                          <Input type="number" step="any" placeholder="Longitude" {...register("longitude")} error={errors.longitude?.message} />
-                        </div>
-                        <Button type="button" variant="secondary" onClick={detectLocation} loading={locating} className="mt-2 w-full text-xs">
-                          <LocateFixed className="h-4 w-4" />
-                          {locating ? "Detecting…" : "Use my current location"}
-                        </Button>
-                        <p className="text-[11px] text-slate-400 mt-1">We’ll fill latitude & longitude automatically. You can edit them.</p>
+                        <GoogleMapPicker
+                          value={pickedLocation}
+                          onChange={(pos) => {
+                            setValue("latitude", pos.lat, { shouldValidate: true });
+                            setValue("longitude", pos.lng, { shouldValidate: true });
+                          }}
+                          error={errors.latitude?.message ?? errors.longitude?.message}
+                        />
                       </div>
                     </div>
                   </div>

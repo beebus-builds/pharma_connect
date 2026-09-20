@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useReducedMotion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  useInView,
+  animate,
+} from "framer-motion";
 import { 
   MapPin, LocateFixed, Stethoscope, ShieldCheck, 
   Clock, Star, Zap, Heart, PhoneCall, 
@@ -17,6 +26,8 @@ import MapViewClient from "@/components/MapViewClient";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import Tilt3D from "@/components/ui/Tilt3D";
+import Hero3D from "@/components/ui/Hero3D";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import type { MedicineDTO, NearbyPharmacyDTO } from "@/types";
 import Link from "next/link";
@@ -28,6 +39,39 @@ const fadeIn = {
   transition: { duration: 0.6 }
 };
 
+/** Animated number that counts up when scrolled into view. */
+function CountUp({ value, label }: { value: string; label: string }) {
+  const m = value.match(/^(\D*)([\d,.]+)(.*)$/);
+  const prefix = m?.[1] ?? "";
+  const suffix = m?.[3] ?? "";
+  const target = m ? parseFloat(m[2].replace(/,/g, "")) : 0;
+  const decimals = m && m[2].includes(".") ? m[2].split(".")[1].length : 0;
+  const valid = Boolean(m);
+
+  const raw = useMotionValue(0);
+  const display = useTransform(raw, (v) =>
+    `${prefix}${v.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    })}${suffix}`
+  );
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-40px" });
+
+  useEffect(() => {
+    if (!inView || !valid) return;
+    const controls = animate(raw, target, { duration: 1.4, ease: "easeOut" });
+    return controls.stop;
+  }, [inView, valid, raw, target]);
+
+  return (
+    <span ref={ref}>
+      <motion.span>{valid ? display : value}</motion.span>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
 const HomePage = () => {
   const { data: session } = useSession();
   const { location, error, loading: locLoading, requestLocation, setManualLocation } = useGeolocation();
@@ -38,7 +82,35 @@ const HomePage = () => {
   const [radiusKm, setRadiusKm] = useState(5);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"list" | "map">("list");
+  const [activePharmacyId, setActivePharmacyId] = useState<string | null>(null);
+  const pharmacyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const shouldReduceMotion = useReducedMotion();
+
+  // Hero parallax: cursor position normalized to -1..1, spring-smoothed
+  const heroMx = useMotionValue(0);
+  const heroMy = useMotionValue(0);
+  const heroSx = useSpring(heroMx, { stiffness: 60, damping: 20 });
+  const heroSy = useSpring(heroMy, { stiffness: 60, damping: 20 });
+  const chip1X = useTransform(heroSx, [-1, 1], [-20, 20]);
+  const chip1Y = useTransform(heroSy, [-1, 1], [-14, 14]);
+  const chip2X = useTransform(heroSx, [-1, 1], [16, -16]);
+  const chip2Y = useTransform(heroSy, [-1, 1], [12, -12]);
+  const blobX = useTransform(heroSx, [-1, 1], [-30, 30]);
+  const blobY = useTransform(heroSy, [-1, 1], [-20, 20]);
+
+  function handleHeroMouseMove(e: React.MouseEvent<HTMLElement>) {
+    if (shouldReduceMotion) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    heroMx.set(((e.clientX - rect.left) / rect.width) * 2 - 1);
+    heroMy.set(((e.clientY - rect.top) / rect.height) * 2 - 1);
+  }
+
+  // Scroll the corresponding list card into view when a pin is clicked on the map
+  useEffect(() => {
+    if (!activePharmacyId) return;
+    const el = pharmacyRefs.current[activePharmacyId];
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [activePharmacyId]);
 
   useEffect(() => {
     requestLocation();
@@ -104,10 +176,52 @@ const HomePage = () => {
   return (
     <div className="flex flex-col gap-16 sm:gap-24 pb-20 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
       {/* 1. Hero Section */}
-      <section className="relative pt-10 sm:pt-16 pb-10 sm:pb-14 bg-slate-900 text-white overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900 to-primary-900/30" aria-hidden="true" />
+      <section
+        className="relative pt-10 sm:pt-16 pb-10 sm:pb-14 bg-slate-900 text-white overflow-hidden"
+        onMouseMove={handleHeroMouseMove}
+      >
+        <motion.div
+          className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900 to-primary-900/30"
+          aria-hidden="true"
+          style={shouldReduceMotion ? undefined : { x: blobX, y: blobY, scale: 1.08 }}
+        />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.06),transparent_50%)]" aria-hidden="true" />
-        <div className="relative max-w-6xl mx-auto px-4">
+
+        {/* Floating depth chips (desktop only, decorative) */}
+        {!shouldReduceMotion && (
+          <>
+            <motion.div
+              aria-hidden="true"
+              style={{ x: chip1X, y: chip1Y }}
+              className="hidden lg:flex absolute top-24 right-[8%] z-20 items-center gap-2 bg-white/10 border border-white/15 backdrop-blur-md rounded-2xl px-4 py-3 shadow-2xl pointer-events-none"
+            >
+              <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse" />
+              <div className="text-left">
+                <p className="text-xs font-bold leading-tight">Paracetamol 500mg</p>
+                <p className="text-[10px] text-emerald-300 leading-tight">In stock · 1.2 km</p>
+              </div>
+              <Pill className="h-4 w-4 text-primary-300" />
+            </motion.div>
+            <motion.div
+              aria-hidden="true"
+              style={{ x: chip2X, y: chip2Y }}
+              className="hidden lg:flex absolute bottom-16 right-[22%] z-20 items-center gap-2 bg-white/10 border border-white/15 backdrop-blur-md rounded-2xl px-4 py-3 shadow-2xl pointer-events-none"
+            >
+              <MapPin className="h-4 w-4 text-blue-300" />
+              <div className="text-left">
+                <p className="text-xs font-bold leading-tight">4 pharmacies nearby</p>
+                <p className="text-[10px] text-slate-300 leading-tight">Within 5 km radius</p>
+              </div>
+            </motion.div>
+          </>
+        )}
+
+        {/* 3D centerpiece (WebGL, desktop+ only; degrades to CSS pill) */}
+        <div className="hidden lg:block absolute inset-y-0 right-0 w-[46%] z-0">
+          <Hero3D className="h-full w-full" />
+        </div>
+
+        <div className="relative z-10 max-w-6xl mx-auto px-4">
           {session ? (
             <motion.div initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 max-w-3xl">
               <p className="inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase bg-white/10 px-3 py-1.5 rounded-full border border-white/10">
@@ -201,15 +315,18 @@ const HomePage = () => {
             { label: "Daily Searches", value: "2k+", icon: <Search className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-emerald-500" },
             { label: "Patients Helped", value: "50k+", icon: <Users className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-amber-500" },
           ].map((stat, i) => (
-            <motion.div
-              key={i}
-              whileHover={shouldReduceMotion ? {} : { y: -4 }}
-              className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl shadow-lg sm:shadow-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center"
-            >
-              <div className={`${stat.color} text-white p-2.5 sm:p-3 rounded-xl mb-3 sm:mb-4 shadow-lg`}>{stat.icon}</div>
-              <div className="text-2xl sm:text-3xl font-black mb-1 text-slate-900 dark:text-white">{stat.value}</div>
-              <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest leading-tight">{stat.label}</div>
-            </motion.div>
+            <Tilt3D key={i} maxTilt={10} className="rounded-2xl">
+              <motion.div
+                whileHover={shouldReduceMotion ? {} : { y: -6 }}
+                className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl shadow-lg sm:shadow-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center h-full"
+              >
+                <div className={`${stat.color} text-white p-2.5 sm:p-3 rounded-xl mb-3 sm:mb-4 shadow-lg`}>{stat.icon}</div>
+                <div className="text-2xl sm:text-3xl font-black mb-1 text-slate-900 dark:text-white">
+                  <CountUp value={stat.value} label={stat.label} />
+                </div>
+                <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest leading-tight">{stat.label}</div>
+              </motion.div>
+            </Tilt3D>
           ))}
         </div>
       </section>
@@ -301,12 +418,21 @@ const HomePage = () => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: shouldReduceMotion ? 0 : i * 0.05 }}
                   >
-                    <PharmacyCard
-                      pharmacy={p}
-                      onRequest={handleRequest}
-                      requesting={requestingId === p.id}
-                      canRequest={!session || session.user.role === "PATIENT"}
-                    />
+                    <div
+                      ref={(el) => {
+                        pharmacyRefs.current[p.id] = el;
+                      }}
+                      onMouseEnter={() => setActivePharmacyId(p.id)}
+                      onMouseLeave={() => setActivePharmacyId((cur) => (cur === p.id ? null : cur))}
+                    >
+                      <PharmacyCard
+                        pharmacy={p}
+                        onRequest={handleRequest}
+                        requesting={requestingId === p.id}
+                        canRequest={!session || session.user.role === "PATIENT"}
+                        highlighted={activePharmacyId === p.id}
+                      />
+                    </div>
                   </motion.div>
                 ))}
               </div>
@@ -314,7 +440,12 @@ const HomePage = () => {
           </div>
 
           <div className={`lg:col-span-7 h-[420px] sm:h-[520px] lg:h-[600px] lg:sticky lg:top-20 rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl relative ${activeTab === "list" ? "hidden lg:block" : "block"}`}>
-            <MapViewClient userLocation={location} pharmacies={pharmacies} />
+            <MapViewClient
+              userLocation={location}
+              pharmacies={pharmacies}
+              activePharmacyId={activePharmacyId}
+              onSelectPharmacy={setActivePharmacyId}
+            />
             {!medicine && (
               <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px] z-10 flex items-center justify-center p-4 sm:p-6 text-center">
                 <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-sm w-full">
@@ -368,20 +499,21 @@ const HomePage = () => {
                 color: "from-emerald-400 to-teal-500"
               },
             ].map((feat, i) => (
-              <motion.div 
-                key={i} 
-                {...fadeIn} 
-                transition={{ delay: i * 0.2 }}
-                whileHover={{ y: -10 }}
-              >
-                <Card className="p-8 h-full border-none shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t-4 border-primary-600">
-                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feat.color} text-white flex items-center justify-center mb-8 shadow-lg`}>
-                    {feat.icon}
-                  </div>
-                  <h3 className="text-2xl font-bold mb-4">{feat.title}</h3>
-                  <p className="text-slate-500 leading-relaxed text-lg">{feat.desc}</p>
-                </Card>
-              </motion.div>
+              <Tilt3D key={i} maxTilt={6} className="h-full">
+                <motion.div 
+                  {...fadeIn} 
+                  transition={{ delay: i * 0.2 }}
+                  className="h-full"
+                >
+                  <Card className="p-8 h-full border-none shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t-4 border-primary-600">
+                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feat.color} text-white flex items-center justify-center mb-8 shadow-lg`}>
+                      {feat.icon}
+                    </div>
+                    <h3 className="text-2xl font-bold mb-4">{feat.title}</h3>
+                    <p className="text-slate-500 leading-relaxed text-lg">{feat.desc}</p>
+                  </Card>
+                </motion.div>
+              </Tilt3D>
             ))}
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { BadgeCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StockStatus } from "@/types";
 
@@ -37,4 +38,13 @@ export function StatusBadge({ status, label }: { status: "PENDING" | "AVAILABLE"
     UNAVAILABLE: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
   };
   return <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full", styles[status])}>{label || status}</span>;
+}
+
+export function VerifiedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+      <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
+      Verified
+    </span>
+  );
 }

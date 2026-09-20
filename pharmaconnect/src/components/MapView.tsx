@@ -1,25 +1,31 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from "react-leaflet";
 import L from "leaflet";
 import { useTheme } from "@/components/ThemeProvider";
+import { VerifiedBadge } from "@/components/ui/Badge";
+import { viberUrl, whatsappUrl } from "@/lib/contact";
 import type { NearbyPharmacyDTO } from "@/types";
 
-// Custom professional marker for pharmacies
-const pharmacyIcon = new L.DivIcon({
-  html: `
-    <div class="relative flex items-center justify-center">
-      <div class="absolute w-8 h-8 bg-primary-500/20 rounded-full animate-ping"></div>
-      <div class="relative w-6 h-6 bg-primary-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+// Custom professional marker for pharmacies (scales up when active)
+function makePharmacyIcon(active: boolean) {
+  return new L.DivIcon({
+    html: `
+      <div class="relative flex items-center justify-center ${active ? "scale-125 z-[999]" : ""} transition-transform">
+        <div class="absolute ${active ? "w-10 h-10 bg-primary-500/30" : "w-8 h-8 bg-primary-500/20"} rounded-full animate-ping"></div>
+        <div class="relative ${active ? "w-8 h-8" : "w-6 h-6"} ${active ? "bg-primary-500 ring-4 ring-primary-500/40" : "bg-primary-600"} rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
       </div>
-    </div>
-  `,
-  className: "",
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
-});
+    `,
+    className: "",
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+const pharmacyIcon = makePharmacyIcon(false);
+const activePharmacyIcon = makePharmacyIcon(true);
 
 const userIcon = new L.DivIcon({
   html: `
@@ -67,12 +73,59 @@ function FitBounds({
   return null;
 }
 
+/** Handles all imperative map reactions to list hover/selection changes. */
+function ActiveMarkerSync({
+  userLocation,
+  pharmacies,
+  activeId,
+}: {
+  userLocation: { lat: number; lng: number } | null;
+  pharmacies: NearbyPharmacyDTO[];
+  activeId: string | null;
+}) {
+  const map = useMap();
+  const lastActiveRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!activeId) {
+      lastActiveRef.current = null;
+      return;
+    }
+    const p = pharmacies.find((x) => x.id === activeId);
+    if (!p) return;
+    const isSelectionChange = lastActiveRef.current !== activeId;
+    lastActiveRef.current = activeId;
+    if (!isSelectionChange) return; // only fly on change, not on every hover
+    map.flyTo([p.latitude, p.longitude], Math.max(map.getZoom(), 14), {
+      duration: 0.6,
+      easeLinearity: 0.2,
+    });
+  }, [activeId, pharmacies, map]);
+
+  // Re-fit bounds when a selection is cleared so all pins come back into view
+  useEffect(() => {
+    if (activeId || pharmacies.length === 0) return;
+    const bounds = L.latLngBounds([]);
+    if (userLocation) bounds.extend([userLocation.lat, userLocation.lng]);
+    pharmacies.forEach((p) => bounds.extend([p.latitude, p.longitude]));
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15, duration: 0.8 });
+    }
+  }, [activeId, userLocation, pharmacies, map]);
+
+  return null;
+}
+
 interface MapViewProps {
   userLocation: { lat: number; lng: number } | null;
   pharmacies: NearbyPharmacyDTO[];
+  /** Pharmacy currently hovered/selected in the results list. */
+  activePharmacyId?: string | null;
+  /** Called when a pharmacy marker is clicked on the map. */
+  onSelectPharmacy?: (id: string) => void;
 }
 
-export default function MapView({ userLocation, pharmacies }: MapViewProps) {
+export default function MapView({ userLocation, pharmacies, activePharmacyId, onSelectPharmacy }: MapViewProps) {
   const { theme } = useTheme();
   const center: [number, number] = userLocation
     ? [userLocation.lat, userLocation.lng]
@@ -88,6 +141,11 @@ export default function MapView({ userLocation, pharmacies }: MapViewProps) {
       <TileLayer attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>' url={tileUrl} />
       <ZoomControl position="bottomright" />
       <FitBounds userLocation={userLocation} pharmacies={pharmacies} />
+      <ActiveMarkerSync
+        userLocation={userLocation}
+        pharmacies={pharmacies}
+        activeId={activePharmacyId ?? null}
+      />
 
       {userLocation && (
         <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} alt="Your location">
@@ -99,7 +157,13 @@ export default function MapView({ userLocation, pharmacies }: MapViewProps) {
       )}
 
       {pharmacies.map((p) => (
-        <Marker key={p.id} position={[p.latitude, p.longitude]} icon={pharmacyIcon} alt={p.name}>
+        <Marker
+          key={p.id}
+          position={[p.latitude, p.longitude]}
+          icon={activePharmacyId === p.id ? activePharmacyIcon : pharmacyIcon}
+          alt={p.name}
+          eventHandlers={{ click: () => onSelectPharmacy?.(p.id) }}
+        >
           <Popup className="custom-popup" maxWidth={240}>
             <div className="p-1 min-w-[200px]">
               <div className="flex items-start gap-2 mb-2">
@@ -107,7 +171,10 @@ export default function MapView({ userLocation, pharmacies }: MapViewProps) {
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-slate-900 leading-tight text-sm">{p.name}</p>
+                  <p className="font-bold text-slate-900 leading-tight text-sm flex items-center gap-1.5 flex-wrap">
+                    {p.name}
+                    {p.verified && <VerifiedBadge />}
+                  </p>
                   <p className="text-xs text-slate-500 line-clamp-2">{p.address}</p>
                 </div>
               </div>
@@ -127,14 +194,48 @@ export default function MapView({ userLocation, pharmacies }: MapViewProps) {
                   </span>
                 </div>
               </div>
-              <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-center mt-3 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
-              >
-                Get Directions
-              </a>
+              <div className="flex gap-2 mt-3">
+                <a
+                  href={`https://www.google.com/maps/?q=${p.latitude},${p.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 text-center py-2 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
+                >
+                  View on Google Maps
+                </a>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 text-center py-2 bg-primary-600 text-white rounded-xl text-xs font-bold hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
+                >
+                  Get Directions
+                </a>
+              </div>
+              {(whatsappUrl(p.phone, p.name) || viberUrl(p.phone)) && (
+                <div className="flex gap-2 mt-2">
+                  {whatsappUrl(p.phone, p.name) && (
+                    <a
+                      href={whatsappUrl(p.phone, p.name)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-center py-2 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
+                    >
+                      WhatsApp — no account needed
+                    </a>
+                  )}
+                  {viberUrl(p.phone) && (
+                    <a
+                      href={viberUrl(p.phone)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-center py-2 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
+                    >
+                      Viber
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </Popup>
         </Marker>

@@ -15,6 +15,7 @@ export interface NearbyPharmacyDTO {
   phone: string;
   latitude: number;
   longitude: number;
+  verified: boolean;
   distanceKm: number;
   quantity: number;
   stockStatus: StockStatus;

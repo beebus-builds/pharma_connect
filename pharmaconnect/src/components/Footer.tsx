@@ -24,7 +24,7 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <Link href="/" className="flex items-center gap-2 font-black text-2xl text-primary-700 dark:text-primary-400 mb-6 hover:opacity-80 transition-opacity">
               <div className="p-1.5 bg-primary-600 text-white rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
               PharmaConnect
             </Link>

@@ -26,6 +26,20 @@ enum PaymentStatus {
   FAILED
 }
 
+enum ReportReason {
+  WRONG_STOCK
+  CLOSED
+  WRONG_LOCATION
+  FAKE_LISTING
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -39,6 +53,7 @@ model User {
   pharmacy Pharmacy?
   requests Request[] @relation("PatientRequests")
   messages Message[]
+  reports  Report[]  @relation("ReporterReports")
 
   @@index([email])
 }
@@ -57,9 +72,13 @@ model Pharmacy {
   stocks   PharmacyStock[]
   requests Request[]       @relation("PharmacyRequests")
   payments Payment[]
+  reports  Report[]        @relation("PharmacyReports")
 
   subscriptionActive    Boolean   @default(false)
   subscriptionExpiresAt DateTime?
+
+  verified   Boolean   @default(false)
+  verifiedAt DateTime?
 
   createdAt DateTime @default(now())
 
@@ -155,4 +174,21 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  pharmacyId String
+  pharmacy   Pharmacy     @relation("PharmacyReports", fields: [pharmacyId], references: [id], onDelete: Cascade)
+  reporterId String
+  reporter   User         @relation("ReporterReports", fields: [reporterId], references: [id], onDelete: Cascade)
+  reason     ReportReason
+  details    String?      @db.VarChar(1000)
+  status     ReportStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([pharmacyId])
+  @@index([status])
+  @@index([reporterId])
 }

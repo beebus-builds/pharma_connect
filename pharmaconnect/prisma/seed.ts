@@ -1,6 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
+// Test accounts (dev only — never commit real credentials):
+//   Patient:  patient@example.com / password123
+//   Pharmacy: pharmacy1@example.com / password123 (…pharmacy2..5)
+//   Admin:    admin@pharmaconnect.local / Admin@123!
+
 const prisma = new PrismaClient();
 
 const medicinesData = [
@@ -97,9 +102,21 @@ async function main() {
       email: "patient@example.com",
       password: hashedPassword,
       role: "PATIENT",
+      emailVerified: true,
     },
   });
   console.log(`Created patient: ${patient.email}`);
+
+  const admin = await prisma.user.create({
+    data: {
+      name: "Site Admin",
+      email: "admin@pharmaconnect.local",
+      password: await bcrypt.hash("Admin@123!", 10),
+      role: "ADMIN",
+      emailVerified: true,
+    },
+  });
+  console.log(`Created admin: ${admin.email}`);
 
   const medicines = [];
   for (const m of medicinesData) {
@@ -115,6 +132,7 @@ async function main() {
         email: p.email,
         password: hashedPassword,
         role: "PHARMACY",
+        emailVerified: true,
         pharmacy: {
           create: {
             name: p.name,
@@ -123,6 +141,8 @@ async function main() {
             latitude: p.latitude,
             longitude: p.longitude,
             licenseNumber: p.licenseNumber,
+            verified: true,
+            verifiedAt: new Date(),
           },
         },
       },

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { User, MapPin, Phone, Mail, ShieldCheck, Building2, BadgeCheck } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/Badge";
+import { VerifiedBadge } from "@/components/ui/Badge";
+import GoogleMapView from "@/components/GoogleMapView";
 import toast from "react-hot-toast";
 
 export default function ProfilePage() {
@@ -91,12 +93,25 @@ export default function ProfilePage() {
                   <Building2 className="h-4 w-4" />
                 </div>
                 Pharmacy Information
+                {user.pharmacy?.verified && <VerifiedBadge />}
               </h3>
               <div className="grid sm:grid-cols-2 gap-4">
                 <DetailRow icon={<Building2 className="h-4 w-4" />} label="Pharmacy Name" value={user.pharmacy?.name || "Not available"} />
                 <DetailRow icon={<Phone className="h-4 w-4" />} label="Phone" value={user.pharmacy?.phone || "Not available"} />
                 <DetailRow icon={<MapPin className="h-4 w-4" />} label="Address" value={user.pharmacy?.address || "Not available"} className="sm:col-span-2" />
               </div>
+              {typeof user.pharmacy?.latitude === "number" && typeof user.pharmacy?.longitude === "number" && (
+                <div className="mt-4">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pinned location</label>
+                  <div className="mt-2">
+                    <GoogleMapView
+                      lat={user.pharmacy.latitude}
+                      lng={user.pharmacy.longitude}
+                      name={user.pharmacy.name}
+                    />
+                  </div>
+                </div>
+              )}
             </Card>
           )}
         </div>

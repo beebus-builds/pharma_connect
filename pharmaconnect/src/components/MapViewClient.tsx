@@ -15,6 +15,8 @@ const MapView = dynamic(() => import("@/components/MapView"), {
 interface Props {
   userLocation: { lat: number; lng: number } | null;
   pharmacies: NearbyPharmacyDTO[];
+  activePharmacyId?: string | null;
+  onSelectPharmacy?: (id: string) => void;
 }
 
 export default function MapViewClient(props: Props) {

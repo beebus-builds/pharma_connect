@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isDisposableEmail, isInNepal } from "./nepal";
 
 export const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -13,6 +14,13 @@ export const registerSchema = z.object({
   longitude: z.coerce.number().optional(),
   licenseNumber: z.string().optional(),
 }).superRefine((data, ctx) => {
+  if (isDisposableEmail(data.email)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["email"],
+      message: "Please use a permanent email address — verification mail can't reach throwaway inboxes",
+    });
+  }
   if (data.role === "PHARMACY") {
     if (!data.pharmacyName || data.pharmacyName.trim().length < 2) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["pharmacyName"], message: "Pharmacy name is required" });
@@ -28,6 +36,19 @@ export const registerSchema = z.object({
     }
     if (data.longitude === undefined || Number.isNaN(data.longitude)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["longitude"], message: "Longitude is required" });
+    }
+    if (
+      data.latitude !== undefined &&
+      data.longitude !== undefined &&
+      !Number.isNaN(data.latitude) &&
+      !Number.isNaN(data.longitude) &&
+      !isInNepal(data.latitude, data.longitude)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["latitude"],
+        message: "Location must be inside Nepal — pin your exact shop location on the map",
+      });
     }
   }
 });
@@ -60,6 +81,26 @@ export const requestUpdateSchema = z.object({
 });
 
 export type RequestUpdateInput = z.infer<typeof requestUpdateSchema>;
+
+export const reportCreateSchema = z.object({
+  pharmacyId: z.string().min(1),
+  reason: z.enum(["WRONG_STOCK", "CLOSED", "WRONG_LOCATION", "FAKE_LISTING", "OTHER"]),
+  details: z.string().max(1000).optional(),
+});
+
+export type ReportCreateInput = z.infer<typeof reportCreateSchema>;
+
+export const reportUpdateSchema = z.object({
+  status: z.enum(["OPEN", "RESOLVED", "DISMISSED"]),
+});
+
+export type ReportUpdateInput = z.infer<typeof reportUpdateSchema>;
+
+export const pharmacyVerifySchema = z.object({
+  verified: z.boolean(),
+});
+
+export type PharmacyVerifyInput = z.infer<typeof pharmacyVerifySchema>;
 
 export const nearbyQuerySchema = z.object({
   lat: z.coerce.number().min(-90).max(90),

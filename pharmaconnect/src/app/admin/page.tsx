@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Pill, Building2, Users, ShieldAlert, ArrowRight } from "lucide-react";
+import { LayoutDashboard, Pill, Building2, Users, ShieldAlert, ArrowRight, Flag } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
@@ -12,7 +12,13 @@ import Link from "next/link";
 export default function AdminDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [stats, setStats] = useState<{pharmacyCount: number, medicineCount: number, userCount: number} | null>(null);
+  const [stats, setStats] = useState<{
+    pharmacyCount: number;
+    medicineCount: number;
+    userCount: number;
+    pendingVerification?: number;
+    openReports?: number;
+  } | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -43,11 +49,12 @@ export default function AdminDashboard() {
     );
   }
 
+  const pendingIssues = (stats?.pendingVerification ?? 0) + (stats?.openReports ?? 0);
   const statCards = [
     { label: "Total Pharmacies", value: stats?.pharmacyCount ?? "...", icon: Building2, color: "bg-primary-600", delay: 0 },
     { label: "Total Medicines", value: stats?.medicineCount ?? "...", icon: Pill, color: "bg-blue-600", delay: 0.1 },
     { label: "Active Users", value: stats?.userCount ?? "...", icon: Users, color: "bg-emerald-600", delay: 0.2 },
-    { label: "Pending Issues", value: "0", icon: ShieldAlert, color: "bg-red-600", delay: 0.3 },
+    { label: "Pending Issues", value: stats ? pendingIssues : "...", icon: ShieldAlert, color: "bg-red-600", delay: 0.3 },
   ];
 
   return (
@@ -84,6 +91,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {[
           { title: "Pharmacy Management", desc: "Verify licenses and manage pharmacy accounts.", icon: Building2, color: "bg-primary-100 dark:bg-primary-900/40 text-primary-600", hoverColor: "group-hover:bg-primary-600 group-hover:text-white", link: "/admin/pharmacies" },
+          { title: "Report Triage", desc: "Review patient-reported listing problems.", icon: Flag, color: "bg-red-100 dark:bg-red-900/40 text-red-600", hoverColor: "group-hover:bg-red-600 group-hover:text-white", link: "/admin/reports" },
           { title: "Medicine Catalog", desc: "Global database of medicines and strengths.", icon: Pill, color: "bg-blue-100 dark:bg-blue-900/40 text-blue-600", hoverColor: "group-hover:bg-blue-600 group-hover:text-white", link: "/admin/medicines" },
         ].map((item, i) => (
           <motion.div
