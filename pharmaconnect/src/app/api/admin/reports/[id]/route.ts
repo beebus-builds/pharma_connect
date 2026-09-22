@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { reportUpdateSchema } from "@/lib/validations";
+import { sendEmailInBackground } from "@/lib/mail";
+import { reportStatusEmail } from "@/lib/emails";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -24,6 +26,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const report = await prisma.report.update({
       where: { id },
       data: { status: parsed.data.status as any },
+      include: {
+        reporter: { select: { name: true, email: true } },
+        pharmacy: { select: { name: true } },
+      },
+    });
+
+    const tpl = reportStatusEmail({
+      reporterName: report.reporter.name,
+      pharmacyName: report.pharmacy.name,
+      status: report.status,
+    });
+    sendEmailInBackground({
+      to: report.reporter.email,
+      subject: tpl.subject,
+      text: tpl.text,
+      html: tpl.html,
     });
 
     return NextResponse.json({ id: report.id, status: report.status });

@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { MapPin, Phone, Send, CheckCircle2, Clock, MessageCircle, PhoneCall, Flag } from "lucide-react";
+import { MapPin, Phone, Send, CheckCircle2, Clock, MessageCircle, PhoneCall, Flag, Store } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/Card";
 import { StockBadge, DistanceBadge, VerifiedBadge } from "@/components/ui/Badge";
@@ -28,6 +30,8 @@ interface PharmacyCardProps {
   canRequest?: boolean;
   /** Set when this pharmacy's pin is hovered/selected on the map. */
   highlighted?: boolean;
+  /** Current user location — used to show distance on the storefront page. */
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 export default function PharmacyCard({
@@ -36,6 +40,7 @@ export default function PharmacyCard({
   requesting,
   canRequest = true,
   highlighted = false,
+  userLocation = null,
 }: PharmacyCardProps) {
   const [isSent, setIsSent] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -121,9 +126,37 @@ export default function PharmacyCard({
         </button>
       </div>
 
-      <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-slate-100 line-clamp-1 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors">
-        {pharmacy.name}
-      </h3>
+      <div className="flex items-center gap-3">
+        <Link
+          href={
+            userLocation
+              ? `/pharmacies/${pharmacy.id}?lat=${userLocation.lat}&lng=${userLocation.lng}`
+              : `/pharmacies/${pharmacy.id}`
+          }
+          className="relative h-11 w-11 rounded-xl overflow-hidden bg-primary-50 dark:bg-primary-950/40 border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center hover:ring-2 hover:ring-primary-500/30 transition-shadow"
+          aria-label={`View ${pharmacy.name} storefront`}
+          title="View all products from this pharmacy"
+        >
+          {pharmacy.profileImageUrl ? (
+            <Image src={pharmacy.profileImageUrl} alt={pharmacy.name} fill className="object-cover" sizes="44px" />
+          ) : (
+            <Store className="h-5 w-5 text-primary-600" aria-hidden="true" />
+          )}
+        </Link>
+        <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-slate-100 line-clamp-1 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors min-w-0">
+          <Link
+            href={
+              userLocation
+                ? `/pharmacies/${pharmacy.id}?lat=${userLocation.lat}&lng=${userLocation.lng}`
+                : `/pharmacies/${pharmacy.id}`
+            }
+            className="hover:underline underline-offset-2"
+            title="View all products from this pharmacy"
+          >
+            {pharmacy.name}
+          </Link>
+        </h3>
+      </div>
       <p className="text-sm text-slate-500 flex items-start gap-1.5 mt-1.5 line-clamp-2">
         <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
         <span className="truncate">{pharmacy.address}</span>
@@ -135,13 +168,18 @@ export default function PharmacyCard({
         </a>
       </p>
 
-      <div className="mt-3 flex items-center gap-2 text-sm">
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 px-2.5 py-1.5 border border-slate-200 dark:border-slate-700">
           <span className="font-bold text-slate-900 dark:text-slate-100">{pharmacy.quantity} units</span>
           <span className="text-slate-500 hidden sm:inline">available</span>
           <span className="text-slate-300">·</span>
           <span className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-[120px]">{pharmacy.medicine.genericName}</span>
         </span>
+        {pharmacy.mrp !== null && pharmacy.mrp !== undefined && (
+          <span className="inline-flex items-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1.5 border border-emerald-200 dark:border-emerald-900 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+            Rs. {pharmacy.mrp}
+          </span>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">

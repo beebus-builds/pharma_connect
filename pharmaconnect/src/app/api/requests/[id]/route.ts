@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requestUpdateSchema } from "@/lib/validations";
+import { sendEmailInBackground } from "@/lib/mail";
+import { requestStatusEmail } from "@/lib/emails";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -39,6 +41,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         medicine: { select: { id: true, genericName: true, brandName: true } },
       },
     });
+
+    // Tell the patient the moment their request is answered.
+    if (existing.status !== updated.status) {
+      const medicineLabel = `${updated.medicine.genericName} (${updated.medicine.brandName})`;
+      const tpl = requestStatusEmail({
+        patientName: updated.patient.name,
+        pharmacyName: updated.pharmacy.name,
+        medicineLabel,
+        status: updated.status as "AVAILABLE" | "UNAVAILABLE" | "PENDING",
+      });
+      sendEmailInBackground({
+        to: updated.patient.email,
+        subject: tpl.subject,
+        text: tpl.text,
+        html: tpl.html,
+      });
+    }
 
     return NextResponse.json({ request: updated });
   } catch (error) {

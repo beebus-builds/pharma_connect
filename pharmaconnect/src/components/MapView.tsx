@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from "react-leaflet";
 import L from "leaflet";
 import { useTheme } from "@/components/ThemeProvider";
 import { VerifiedBadge } from "@/components/ui/Badge";
 import { viberUrl, whatsappUrl } from "@/lib/contact";
+import { FALLBACK_CENTER, filterValidPharmacies, isValidLocation } from "@/lib/geo";
 import type { NearbyPharmacyDTO } from "@/types";
 
 // Custom professional marker for pharmacies (scales up when active)
@@ -127,9 +128,12 @@ interface MapViewProps {
 
 export default function MapView({ userLocation, pharmacies, activePharmacyId, onSelectPharmacy }: MapViewProps) {
   const { theme } = useTheme();
-  const center: [number, number] = userLocation
-    ? [userLocation.lat, userLocation.lng]
-    : [27.7041, 85.3145]; // Kathmandu fallback
+  // Never hand Leaflet a NaN — a single bad coordinate used to crash the whole page.
+  const safeUserLocation = isValidLocation(userLocation) ? userLocation : null;
+  const safePharmacies = useMemo(() => filterValidPharmacies(pharmacies), [pharmacies]);
+  const center: [number, number] = safeUserLocation
+    ? [safeUserLocation.lat, safeUserLocation.lng]
+    : [FALLBACK_CENTER.lat, FALLBACK_CENTER.lng];
 
   const tileUrl =
     theme === "dark"
@@ -140,23 +144,23 @@ export default function MapView({ userLocation, pharmacies, activePharmacyId, on
     <MapContainer center={center} zoom={13} className="h-full w-full" scrollWheelZoom zoomControl={false}>
       <TileLayer attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>' url={tileUrl} />
       <ZoomControl position="bottomright" />
-      <FitBounds userLocation={userLocation} pharmacies={pharmacies} />
+      <FitBounds userLocation={safeUserLocation} pharmacies={safePharmacies} />
       <ActiveMarkerSync
-        userLocation={userLocation}
-        pharmacies={pharmacies}
+        userLocation={safeUserLocation}
+        pharmacies={safePharmacies}
         activeId={activePharmacyId ?? null}
       />
 
-      {userLocation && (
-        <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} alt="Your location">
+      {safeUserLocation && (
+        <Marker position={[safeUserLocation.lat, safeUserLocation.lng]} icon={userIcon} alt="Your location">
           <Popup className="custom-popup">
             <div className="text-sm font-medium text-slate-900">Your Current Location</div>
-            <p className="text-xs text-slate-500">{userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}</p>
+            <p className="text-xs text-slate-500">{safeUserLocation.lat.toFixed(4)}, {safeUserLocation.lng.toFixed(4)}</p>
           </Popup>
         </Marker>
       )}
 
-      {pharmacies.map((p) => (
+      {safePharmacies.map((p) => (
         <Marker
           key={p.id}
           position={[p.latitude, p.longitude]}
@@ -172,7 +176,9 @@ export default function MapView({ userLocation, pharmacies, activePharmacyId, on
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-slate-900 leading-tight text-sm flex items-center gap-1.5 flex-wrap">
-                    {p.name}
+                    <a href={`/pharmacies/${p.id}`} className="hover:text-primary-600 hover:underline underline-offset-2">
+                      {p.name}
+                    </a>
                     {p.verified && <VerifiedBadge />}
                   </p>
                   <p className="text-xs text-slate-500 line-clamp-2">{p.address}</p>

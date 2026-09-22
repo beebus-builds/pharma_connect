@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rateLimit";
+import { sendEmailInBackground } from "@/lib/mail";
+import { newMessageEmail } from "@/lib/emails";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -41,7 +43,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id: requestId } = await params;
-  const request = await prisma.request.findUnique({ where: { id: requestId } });
+  const request = await prisma.request.findUnique({
+    where: { id: requestId },
+    include: {
+      patient: { select: { id: true, name: true, email: true } },
+      pharmacy: {
+        select: {
+          id: true,
+          name: true,
+          user: { select: { email: true, name: true } },
+        },
+      },
+      medicine: { select: { genericName: true, brandName: true } },
+    },
+  });
   if (!request) return NextResponse.json({ error: "Request not found" }, { status: 404 });
 
   const isParticipant = request.patientId === session.user.id || request.pharmacyId === session.user.pharmacyId;
@@ -64,6 +79,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   await prisma.conversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } });
+
+  // Email nudge to the other participant (realtime covers online users; email catches the rest).
+  try {
+    const senderIsPatient = session.user.id === request.patientId;
+    const recipientEmail = senderIsPatient ? request.pharmacy.user.email : request.patient.email;
+    const recipientName = senderIsPatient ? request.pharmacy.user.name : request.patient.name;
+    const medicineLabel = `${request.medicine.genericName} (${request.medicine.brandName})`;
+    const tpl = newMessageEmail({
+      recipientName,
+      senderName: message.sender.name,
+      medicineLabel,
+      preview: content,
+    });
+    sendEmailInBackground({
+      to: recipientEmail,
+      subject: tpl.subject,
+      text: tpl.text,
+      html: tpl.html,
+    });
+  } catch (e) {
+    console.error("[messages] notify email failed:", e);
+  }
 
   // Note: realtime push happens via realtime service if WS is connected;
   // HTTP fallback also returns message for polling clients.

@@ -19,4 +19,11 @@ describe("Utils", () => {
     expect(stockStatus(3)).toBe("low-stock");
     expect(stockStatus(10)).toBe("in-stock");
   });
+
+  it("respects per-product low-stock thresholds", () => {
+    expect(stockStatus(8, 10)).toBe("low-stock");
+    expect(stockStatus(12, 10)).toBe("in-stock");
+    expect(stockStatus(0, 10)).toBe("out-of-stock");
+    expect(stockStatus(10, 10)).toBe("low-stock");
+  });
 });

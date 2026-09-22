@@ -431,6 +431,7 @@ const HomePage = () => {
                         requesting={requestingId === p.id}
                         canRequest={!session || session.user.role === "PATIENT"}
                         highlighted={activePharmacyId === p.id}
+                        userLocation={location}
                       />
                     </div>
                   </motion.div>

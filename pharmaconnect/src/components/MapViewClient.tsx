@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { MapErrorBoundary } from "@/components/MapErrorBoundary";
 import type { NearbyPharmacyDTO } from "@/types";
 
 const MapView = dynamic(() => import("@/components/MapView"), {
@@ -20,5 +21,9 @@ interface Props {
 }
 
 export default function MapViewClient(props: Props) {
-  return <MapView {...props} />;
+  return (
+    <MapErrorBoundary>
+      <MapView {...props} />
+    </MapErrorBoundary>
+  );
 }

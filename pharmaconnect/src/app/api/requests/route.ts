@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requestCreateSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rateLimit";
+import { sendEmailInBackground } from "@/lib/mail";
+import { newRequestEmail } from "@/lib/emails";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -57,7 +59,10 @@ export async function POST(req: NextRequest) {
     const { pharmacyId, medicineId } = parsed.data;
 
     const [pharmacy, medicine] = await Promise.all([
-      prisma.pharmacy.findUnique({ where: { id: pharmacyId } }),
+      prisma.pharmacy.findUnique({
+        where: { id: pharmacyId },
+        include: { user: { select: { email: true } } },
+      }),
       prisma.medicine.findUnique({ where: { id: medicineId } }),
     ]);
 
@@ -74,9 +79,25 @@ export async function POST(req: NextRequest) {
       include: {
         patient: { select: { id: true, name: true, email: true } },
         pharmacy: { select: { id: true, name: true } },
-        medicine: { select: { id: true, genericName: true, brandName: true } },
+        medicine: { select: { id: true, genericName: true, brandName: true, strength: true } },
       },
     });
+
+    // Notify the pharmacy owner so new requests don't sit unseen.
+    if (pharmacy.user?.email) {
+      const medicineLabel = `${request.medicine.genericName} (${request.medicine.brandName})`;
+      const tpl = newRequestEmail({
+        pharmacyName: pharmacy.name,
+        patientName: request.patient.name,
+        medicineLabel,
+      });
+      sendEmailInBackground({
+        to: pharmacy.user.email,
+        subject: tpl.subject,
+        text: tpl.text,
+        html: tpl.html,
+      });
+    }
 
     return NextResponse.json({ request }, { status: 201 });
   } catch (error) {

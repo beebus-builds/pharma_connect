@@ -60,8 +60,8 @@ export default function RegisterPage() {
       if (!res.ok) {
         throw new Error(data.error || "Registration failed");
       }
-      toast.success("Account created! Please log in.");
-      router.push("/login");
+      toast.success(data.message || "Account created! Check your email to verify.");
+      router.push("/login?registered=1");
     } catch (e: any) {
       toast.error(e.message || "Something went wrong");
     }

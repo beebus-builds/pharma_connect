@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { lookupKhaltiPayment, PHARMACY_SUBSCRIPTION_DAYS } from "@/lib/khalti";
+import { sendEmailInBackground } from "@/lib/mail";
+import { subscriptionReceiptEmail } from "@/lib/emails";
 
 function redirectTo(req: NextRequest, status: "success" | "failed" | "pending") {
   const url = new URL("/dashboard/pharmacy", req.url);
@@ -26,7 +28,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (lookup.status === "Completed") {
-    await prisma.$transaction([
+    const [updatedPayment, pharmacy] = await prisma.$transaction([
       prisma.payment.update({
         where: { id: payment.id },
         data: { status: "COMPLETED", transactionId: lookup.transaction_id },
@@ -37,8 +39,22 @@ export async function GET(req: NextRequest) {
           subscriptionActive: true,
           subscriptionExpiresAt: new Date(Date.now() + PHARMACY_SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000),
         },
+        include: { user: { select: { email: true } } },
       }),
     ]);
+    if (pharmacy.user?.email) {
+      const tpl = subscriptionReceiptEmail({
+        pharmacyName: pharmacy.name,
+        amount: updatedPayment.amount,
+        transactionId: updatedPayment.transactionId,
+      });
+      sendEmailInBackground({
+        to: pharmacy.user.email,
+        subject: tpl.subject,
+        text: tpl.text,
+        html: tpl.html,
+      });
+    }
     return redirectTo(req, "success");
   }
 

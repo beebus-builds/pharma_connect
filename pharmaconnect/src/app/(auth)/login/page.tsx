@@ -3,8 +3,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { Stethoscope, Mail, Lock, Eye, EyeOff } from "lucide-react";
@@ -12,10 +12,13 @@ import { loginSchema, type LoginInput } from "@/lib/validations";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 
-export default function LoginPage() {
+function LoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const [showPassword, setShowPassword] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const {
     register,
@@ -29,7 +32,35 @@ export default function LoginPage() {
     }
   }, [session, router]);
 
+  useEffect(() => {
+    if (searchParams.get("registered") === "1") {
+      toast.success("Account created! Check your inbox for the verification email.");
+    }
+    if (searchParams.get("reset") === "done") {
+      toast.success("Password changed. Please log in.");
+    }
+  }, [searchParams]);
+
+  async function resendVerification(email: string) {
+    setResending(true);
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not resend email");
+      toast.success(data.message);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setResending(false);
+    }
+  }
+
   const onSubmit = async (values: LoginInput) => {
+    setNeedsVerification(false);
     const result = await signIn("credentials", {
       redirect: false,
       email: values.email,
@@ -37,7 +68,12 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      toast.error("Invalid email or password");
+      if (/verify/i.test(result.error)) {
+        setNeedsVerification(true);
+        toast.error("Please verify your email first — we can resend the link below.");
+      } else {
+        toast.error("Invalid email or password");
+      }
       return;
     }
 
@@ -90,10 +126,31 @@ export default function LoginPage() {
               </button>
             </div>
 
+            <div className="flex justify-end -mt-2">
+              <Link href="/forgot-password" className="text-xs font-medium text-primary-600 hover:text-primary-700">
+                Forgot password?
+              </Link>
+            </div>
+
             <Button type="submit" loading={isSubmitting} className="w-full">
               Sign in
             </Button>
           </form>
+
+          {needsVerification && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <p className="font-medium">Email not verified yet.</p>
+              <p className="mt-1 text-amber-700">Check your inbox (and spam) for the verification link, or resend it:</p>
+              <Button
+                variant="outline"
+                className="mt-2 w-full"
+                disabled={resending}
+                onClick={() => resendVerification((document.querySelector('input[type="email"]') as HTMLInputElement)?.value ?? "")}
+              >
+                {resending ? "Sending…" : "Resend verification email"}
+              </Button>
+            </div>
+          )}
 
           <div className="mt-6 text-center text-sm text-slate-500">
             Don&apos;t have an account?{" "}
@@ -110,5 +167,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginInner />
+    </Suspense>
   );
 }

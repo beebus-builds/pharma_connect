@@ -40,6 +40,11 @@ enum ReportStatus {
   DISMISSED
 }
 
+enum PharmacyImageKind {
+  PROFILE
+  COVER
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -48,6 +53,9 @@ model User {
   role      Role     @default(PATIENT)
   emailVerified Boolean @default(false)
   verificationToken String?
+  verificationTokenExpires DateTime?
+  passwordResetToken String? @unique
+  passwordResetExpires DateTime?
   createdAt DateTime @default(now())
 
   pharmacy Pharmacy?
@@ -73,6 +81,8 @@ model Pharmacy {
   requests Request[]       @relation("PharmacyRequests")
   payments Payment[]
   reports  Report[]        @relation("PharmacyReports")
+  images   PharmacyImage[]
+  stockHistory StockHistory[]
 
   subscriptionActive    Boolean   @default(false)
   subscriptionExpiresAt DateTime?
@@ -110,6 +120,7 @@ model Medicine {
   manufacturer String
 
   stocks   PharmacyStock[]
+  stockHistory StockHistory[]
   requests Request[]
 
   @@index([genericName])
@@ -123,11 +134,34 @@ model PharmacyStock {
   medicineId String
   medicine   Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
   quantity   Int      @default(0)
+  // Production inventory fields
+  expiryDate          DateTime?
+  mrp                 Int?
+  lowStockThreshold   Int       @default(10)
+  lowStockAlertSentAt DateTime?
   updatedAt  DateTime @updatedAt
 
   @@unique([pharmacyId, medicineId])
   @@index([medicineId])
   @@index([pharmacyId])
+  @@index([expiryDate])
+}
+
+model StockHistory {
+  id          String   @id @default(cuid())
+  pharmacyId  String
+  pharmacy    Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  medicineId  String
+  medicine    Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  oldQuantity Int
+  newQuantity Int
+  delta       Int
+  note        String?  @db.VarChar(200)
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([pharmacyId, createdAt])
+  @@index([medicineId])
 }
 
 model Request {
@@ -174,6 +208,19 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+model PharmacyImage {
+  id         String            @id @default(cuid())
+  pharmacyId String
+  pharmacy   Pharmacy          @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  kind       PharmacyImageKind
+  url        String
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@unique([pharmacyId, kind])
+  @@index([pharmacyId])
 }
 
 model Report {

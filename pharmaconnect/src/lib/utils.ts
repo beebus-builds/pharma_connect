@@ -37,8 +37,11 @@ export function formatDistance(km: number): string {
   return `${km.toFixed(1)} km`;
 }
 
-export function stockStatus(quantity: number): "in-stock" | "low-stock" | "out-of-stock" {
+export function stockStatus(
+  quantity: number,
+  lowThreshold = 5
+): "in-stock" | "low-stock" | "out-of-stock" {
   if (quantity <= 0) return "out-of-stock";
-  if (quantity <= 5) return "low-stock";
+  if (quantity <= lowThreshold) return "low-stock";
   return "in-stock";
 }

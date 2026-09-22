@@ -31,17 +31,17 @@ export const registerSchema = z.object({
     if (!data.phone || data.phone.trim().length < 5) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: "Phone number is required" });
     }
-    if (data.latitude === undefined || Number.isNaN(data.latitude)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["latitude"], message: "Latitude is required" });
+    if (data.latitude === undefined || !Number.isFinite(data.latitude)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["latitude"], message: "Latitude is required — pick your shop location on the map" });
     }
-    if (data.longitude === undefined || Number.isNaN(data.longitude)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["longitude"], message: "Longitude is required" });
+    if (data.longitude === undefined || !Number.isFinite(data.longitude)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["longitude"], message: "Longitude is required — pick your shop location on the map" });
     }
     if (
       data.latitude !== undefined &&
       data.longitude !== undefined &&
-      !Number.isNaN(data.latitude) &&
-      !Number.isNaN(data.longitude) &&
+      Number.isFinite(data.latitude) &&
+      Number.isFinite(data.longitude) &&
       !isInNepal(data.latitude, data.longitude)
     ) {
       ctx.addIssue({
@@ -62,9 +62,42 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
+export const resendVerificationSchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+});
+
+export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+});
+
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  password: z.string().min(6, "Password must be at least 6 characters").max(100),
+});
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
 export const stockUpsertSchema = z.object({
   medicineId: z.string().min(1),
-  quantity: z.coerce.number().int().min(0, "Quantity cannot be negative"),
+  quantity: z.coerce.number().int().min(0, "Quantity cannot be negative").max(1000000),
+  // Optional production fields — empty string from the form counts as "not set".
+  expiryDate: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    z.coerce.date({ invalid_type_error: "Enter a valid expiry date" }).optional()
+  ),
+  mrp: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    z.coerce.number({ invalid_type_error: "MRP must be a number" }).int().min(0, "MRP cannot be negative").max(10000000).optional()
+  ),
+  lowStockThreshold: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    z.coerce.number({ invalid_type_error: "Threshold must be a number" }).int().min(0).max(1000000).optional()
+  ),
+  clearExpiry: z.boolean().optional(),
 });
 
 export type StockUpsertInput = z.infer<typeof stockUpsertSchema>;
@@ -112,3 +145,12 @@ export const nearbyQuerySchema = z.object({
 export const medicineSearchSchema = z.object({
   q: z.string().min(1, "Search query is required"),
 });
+
+export const medicineCreateSchema = z.object({
+  genericName: z.string().trim().min(2, "Generic name is required").max(100),
+  brandName: z.string().trim().min(1, "Brand name is required").max(100),
+  strength: z.string().trim().min(1, "Strength is required (e.g. 500mg)").max(50),
+  manufacturer: z.string().trim().min(2, "Manufacturer is required").max(100),
+});
+
+export type MedicineCreateInput = z.infer<typeof medicineCreateSchema>;

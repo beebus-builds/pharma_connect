@@ -21,8 +21,18 @@ export function useGeolocation() {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        const { latitude, longitude } = pos.coords;
+        // Some devices/drivers return NaN/Infinity — never let those reach the map.
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          setState({
+            location: null,
+            error: "Your device returned an unreadable location. Please try again.",
+            loading: false,
+          });
+          return;
+        }
         setState({
-          location: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          location: { lat: latitude, lng: longitude },
           error: null,
           loading: false,
         });
@@ -43,6 +53,10 @@ export function useGeolocation() {
   }, []);
 
   const setManualLocation = useCallback((lat: number, lng: number) => {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setState({ location: null, error: "That location looks invalid. Please try again.", loading: false });
+      return;
+    }
     setState({ location: { lat, lng }, error: null, loading: false });
   }, []);
 

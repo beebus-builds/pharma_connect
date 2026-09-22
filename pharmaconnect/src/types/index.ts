@@ -19,7 +19,39 @@ export interface NearbyPharmacyDTO {
   distanceKm: number;
   quantity: number;
   stockStatus: StockStatus;
+  mrp: number | null;
+  expiryDate: string | null;
+  profileImageUrl: string | null;
+  coverImageUrl: string | null;
   medicine: MedicineDTO;
+}
+
+export interface PharmacyImageDTO {
+  id: string;
+  kind: "PROFILE" | "COVER";
+  url: string;
+}
+
+export interface PharmacyStorefrontDTO {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  latitude: number;
+  longitude: number;
+  verified: boolean;
+  distanceKm: number | null;
+  profileImageUrl: string | null;
+  coverImageUrl: string | null;
+  inStockCount: number;
+  products: Array<{
+    medicine: MedicineDTO;
+    quantity: number;
+    stockStatus: StockStatus;
+    mrp: number | null;
+    expiryDate: string | null;
+    updatedAt: string;
+  }>;
 }
 
 export interface RequestDTO {

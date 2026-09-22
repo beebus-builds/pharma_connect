@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/lib/validations";
 import { sendEmail } from "@/lib/mail";
+import { verificationEmail } from "@/lib/emails";
 import { rateLimit } from "@/lib/rateLimit";
 import crypto from "crypto";
 
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const user = await prisma.user.create({
       data: {
@@ -39,6 +41,7 @@ export async function POST(req: NextRequest) {
         password: hashedPassword,
         role: data.role,
         verificationToken,
+        verificationTokenExpires,
         emailVerified: false,
         pharmacy: data.role === "PHARMACY" ? {
           create: {
@@ -53,17 +56,29 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const verificationUrl = `${process.env.NEXTAUTH_URL}/auth/verify?token=${verificationToken}`;
-
-    await sendEmail({
+    const tpl = verificationEmail(user.name, verificationToken);
+    const mailResult = await sendEmail({
       to: email,
-      subject: "Verify your PharmaConnect account",
-      text: `Please verify your email by clicking this link: ${verificationUrl}`,
-      html: `<p>Welcome to PharmaConnect!</p><p>Please verify your email address by clicking the button below:</p><a href="${verificationUrl}" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;">Verify Email</a>`,
+      subject: tpl.subject,
+      text: tpl.text,
+      html: tpl.html,
     });
 
+    if (!mailResult.success) {
+      console.warn("[register] verification email failed for", email, mailResult.error);
+    }
+
     return NextResponse.json(
-      { id: user.id, name: user.name, email: user.email, role: user.role, message: "Account created! Please check your email to verify your account." },
+      {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        message: mailResult.success
+          ? "Account created! Please check your email to verify your account."
+          : "Account created, but we couldn't send the verification email. Use 'Resend verification' on the login page.",
+        emailSent: mailResult.success,
+      },
       { status: 201 }
     );
   } catch (error) {
