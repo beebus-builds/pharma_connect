@@ -10,6 +10,8 @@ import {
   resetPasswordSchema,
   resendVerificationSchema,
   medicineCreateSchema,
+  medicineSearchSchema,
+  nearbyQuerySchema,
   stockUpsertSchema,
 } from "../validations";
 import { verificationEmail, welcomeEmail, passwordResetEmail } from "../emails";
@@ -181,6 +183,16 @@ describe("Validations", () => {
     expect(medicineCreateSchema.safeParse(good).success).toBe(true);
     expect(medicineCreateSchema.safeParse({ ...good, genericName: "x" }).success).toBe(false);
     expect(medicineCreateSchema.safeParse({ ...good, strength: "" }).success).toBe(false);
+  });
+
+  it("validates paginated search inputs", () => {
+    expect(
+      nearbyQuerySchema.safeParse({ lat: "27.7172", lng: "85.324", limit: "20" }).success
+    ).toBe(true);
+    expect(nearbyQuerySchema.safeParse({ lat: "", lng: "85.324" }).success).toBe(false);
+    expect(nearbyQuerySchema.safeParse({ lat: "27.7172", lng: "85.324", limit: "51" }).success).toBe(false);
+    expect(medicineSearchSchema.safeParse({ q: "para", limit: "15" }).success).toBe(true);
+    expect(medicineSearchSchema.safeParse({ q: "para", limit: "31" }).success).toBe(false);
   });
 
   it("validates pharmacy photo uploads", () => {

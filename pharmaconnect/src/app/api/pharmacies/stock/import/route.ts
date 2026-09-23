@@ -24,7 +24,7 @@ interface RowError {
  * hidden from patient search until the expiry is fixed.
  */
 export async function POST(req: NextRequest) {
-  const limited = rateLimit(req, 5, 60_000);
+  const limited = await rateLimit(req, 5, 60_000);
   if (limited) return limited;
 
   try {

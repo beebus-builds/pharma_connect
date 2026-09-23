@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const limited = rateLimit(req, 30, 60_000);
+  const limited = await rateLimit(req, 30, 60_000);
   if (limited) return limited;
 
   try {
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
 
 /** Remove a product from the pharmacy's inventory entirely. */
 export async function DELETE(req: NextRequest) {
-  const limited = rateLimit(req, 20, 60_000);
+  const limited = await rateLimit(req, 20, 60_000);
   if (limited) return limited;
 
   try {

@@ -90,8 +90,8 @@ export default async function PharmacyStorefrontPage({ params, searchParams }: P
   const storefront = await getStorefront(id);
   if (!storefront) notFound();
 
-  const lat = Number(sp.lat);
-  const lng = Number(sp.lng);
+  const lat = sp.lat?.trim() ? Number(sp.lat) : Number.NaN;
+  const lng = sp.lng?.trim() ? Number(sp.lng) : Number.NaN;
   if (isValidLatLng(lat, lng)) {
     storefront.distanceKm =
       Math.round(haversineDistanceKm(lat, lng, storefront.latitude, storefront.longitude) * 100) / 100;

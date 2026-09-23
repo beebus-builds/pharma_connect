@@ -15,7 +15,7 @@ import { rateLimit } from "@/lib/rateLimit";
  */
 export async function POST(req: NextRequest) {
   try {
-    const limited = rateLimit(req, 5, 60000);
+    const limited = await rateLimit(req, 5, 60000);
     if (limited) return limited;
 
     const body = await req.json();
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       include: { pharmacy: true },
     });
 
-    if (!user) {
+    if (!user || !user.emailVerified) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 

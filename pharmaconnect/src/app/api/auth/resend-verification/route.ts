@@ -8,7 +8,7 @@ import { rateLimit } from "@/lib/rateLimit";
 
 /** Re-send verification email. Always returns success to avoid email enumeration. */
 export async function POST(req: NextRequest) {
-  const limited = rateLimit(req, 5, 60_000);
+  const limited = await rateLimit(req, 5, 60_000);
   if (limited) return limited;
 
   try {

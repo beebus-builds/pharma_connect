@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const limited = rateLimit(req, 20, 60000);
+    const limited = await rateLimit(req, 20, 60000);
     if (limited) return limited;
 
     const session = await getServerSession(authOptions);

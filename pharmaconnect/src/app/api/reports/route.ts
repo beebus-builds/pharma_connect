@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Only patient accounts can file reports" }, { status: 403 });
     }
 
-    const limited = rateLimit(req, 10, 60000);
+    const limited = await rateLimit(req, 10, 60000);
     if (limited) return limited;
 
     const body = await req.json();

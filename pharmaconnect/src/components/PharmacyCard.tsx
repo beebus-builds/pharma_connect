@@ -6,12 +6,13 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { MapPin, Phone, Send, CheckCircle2, Clock, MessageCircle, PhoneCall, Flag, Store } from "lucide-react";
+import { MapPin, Phone, Send, CheckCircle2, Clock, MessageCircle, PhoneCall, Flag, Store, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/Card";
 import { StockBadge, DistanceBadge, VerifiedBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 import { viberUrl, whatsappUrl } from "@/lib/contact";
 import type { NearbyPharmacyDTO } from "@/types";
 
@@ -113,7 +114,7 @@ export default function PharmacyCard({
         {pharmacy.verified && <VerifiedBadge />}
         <span className="ml-auto flex items-center gap-1 text-xs text-slate-400">
           <Clock className="h-3 w-3" />
-          Updated just now
+          {formatRelativeTime(pharmacy.stockUpdatedAt)}
         </span>
         <button
           type="button"
@@ -182,7 +183,7 @@ export default function PharmacyCard({
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <a
           href={`tel:${pharmacy.phone}`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
@@ -191,55 +192,11 @@ export default function PharmacyCard({
           <Phone className="h-3.5 w-3.5" />
           Call
         </a>
-        <a
-          href={`https://www.google.com/maps/?q=${pharmacy.latitude},${pharmacy.longitude}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
-          aria-label={`View ${pharmacy.name} on Google Maps`}
-        >
-          <MapPin className="h-3.5 w-3.5" />
-          View Map
-        </a>
-        {waLink && (
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
-            aria-label={`Chat with ${pharmacy.name} on WhatsApp — no account needed`}
-          >
-            <MessageCircle className="h-3.5 w-3.5" />
-            WhatsApp
-          </a>
-        )}
-        {viberLink && (
-          <a
-            href={viberLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
-            aria-label={`Chat with ${pharmacy.name} on Viber — no account needed`}
-          >
-            <PhoneCall className="h-3.5 w-3.5" />
-            Viber
-          </a>
-        )}
-        <a
-          href={`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.latitude},${pharmacy.longitude}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
-          aria-label={`Get directions to ${pharmacy.name}`}
-        >
-          <MapPin className="h-3.5 w-3.5" />
-          Directions
-        </a>
         {canRequest && onRequest && (
           <Button
             variant={isSent ? "primary" : "secondary"}
             className={cn(
-              "text-xs px-4 py-2 min-w-[108px] ml-auto sm:ml-0",
+              "text-xs px-4 py-2 min-w-[108px]",
               isSent && "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
             )}
             loading={requesting}
@@ -260,6 +217,49 @@ export default function PharmacyCard({
             )}
           </Button>
         )}
+        <details className="relative ml-auto">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 [&::-webkit-details-marker]:hidden">
+            More <ChevronDown className="h-3.5 w-3.5" />
+          </summary>
+          <div className="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1.5 shadow-xl">
+            <a
+              href={`https://www.google.com/maps/?q=${pharmacy.latitude},${pharmacy.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              <MapPin className="h-3.5 w-3.5" /> View Map
+            </a>
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.latitude},${pharmacy.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              <MapPin className="h-3.5 w-3.5" /> Directions
+            </a>
+            {waLink && (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+              </a>
+            )}
+            {viberLink && (
+              <a
+                href={viberLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                <PhoneCall className="h-3.5 w-3.5" /> Viber
+              </a>
+            )}
+          </div>
+        </details>
       </div>
       {reportOpen && (
         <div

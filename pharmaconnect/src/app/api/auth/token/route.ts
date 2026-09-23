@@ -17,7 +17,12 @@ export async function GET() {
       pharmacyId: session.user.pharmacyId ?? null,
     },
     secret,
-    { expiresIn: "1h" }
+    {
+      expiresIn: "1h",
+      algorithm: "HS256",
+      issuer: "pharmaconnect-web",
+      audience: "pharmaconnect-realtime",
+    }
   );
 
   return NextResponse.json({ token });

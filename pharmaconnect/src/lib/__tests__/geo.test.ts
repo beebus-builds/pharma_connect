@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { isValidLatLng, isValidLocation, safeCenter, filterValidPharmacies, FALLBACK_CENTER } from "../geo";
+import {
+  boundingBoxForRadius,
+  isValidLatLng,
+  isValidLocation,
+  safeCenter,
+  filterValidPharmacies,
+  FALLBACK_CENTER,
+} from "../geo";
 
 describe("geo guards", () => {
   it("accepts normal Kathmandu coords", () => {
@@ -28,6 +35,14 @@ describe("geo guards", () => {
     expect(safeCenter({ lat: NaN, lng: NaN })).toEqual(FALLBACK_CENTER);
     expect(safeCenter(null)).toEqual(FALLBACK_CENTER);
     expect(safeCenter({ lat: 27.7, lng: 85.3 })).toEqual({ lat: 27.7, lng: 85.3 });
+  });
+
+  it("creates a conservative radius bounding box", () => {
+    const box = boundingBoxForRadius(27.7172, 85.324, 5);
+    expect(box.minLat).toBeLessThan(27.7172);
+    expect(box.maxLat).toBeGreaterThan(27.7172);
+    expect(box.minLng).toBeLessThan(85.324);
+    expect(box.maxLng).toBeGreaterThan(85.324);
   });
 
   it("filterValidPharmacies drops bad rows, keeps good ones", () => {

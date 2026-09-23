@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { isDisposableEmail, isInNepal } from "./nepal";
 
+const queryNumber = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess(
+    (value) => (value === null || (typeof value === "string" && value.trim() === "") ? undefined : value),
+    schema
+  );
+
 export const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
   email: z.string().email("Enter a valid email address"),
@@ -136,14 +142,18 @@ export const pharmacyVerifySchema = z.object({
 export type PharmacyVerifyInput = z.infer<typeof pharmacyVerifySchema>;
 
 export const nearbyQuerySchema = z.object({
-  lat: z.coerce.number().min(-90).max(90),
-  lng: z.coerce.number().min(-180).max(180),
+  lat: queryNumber(z.coerce.number().min(-90).max(90)),
+  lng: queryNumber(z.coerce.number().min(-180).max(180)),
   medicineId: z.string().optional(),
-  radiusKm: z.coerce.number().min(0).max(500).optional().default(50),
+  radiusKm: queryNumber(z.coerce.number().min(0).max(500)).optional().default(50),
+  limit: queryNumber(z.coerce.number().int().min(1).max(50)).optional().default(20),
+  cursor: z.string().max(500).optional(),
 });
 
 export const medicineSearchSchema = z.object({
-  q: z.string().min(1, "Search query is required"),
+  q: z.string().trim().min(1, "Search query is required"),
+  limit: queryNumber(z.coerce.number().int().min(1).max(30)).optional().default(15),
+  cursor: z.string().max(500).optional(),
 });
 
 export const medicineCreateSchema = z.object({

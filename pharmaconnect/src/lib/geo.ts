@@ -7,6 +7,26 @@ export interface LatLng {
   lng: number;
 }
 
+export interface BoundingBox {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
+export function boundingBoxForRadius(lat: number, lng: number, radiusKm: number): BoundingBox {
+  const latDelta = radiusKm / 110.574;
+  const latitudeFactor = Math.max(Math.abs(Math.cos((lat * Math.PI) / 180)), 0.01);
+  const lngDelta = radiusKm / (111.32 * latitudeFactor);
+
+  return {
+    minLat: Math.max(-90, lat - latDelta),
+    maxLat: Math.min(90, lat + latDelta),
+    minLng: Math.max(-180, lng - lngDelta),
+    maxLng: Math.min(180, lng + lngDelta),
+  };
+}
+
 export const FALLBACK_CENTER: LatLng = { lat: 27.7041, lng: 85.3145 }; // Kathmandu
 
 export function isValidLatLng(lat: unknown, lng: unknown): lat is number {

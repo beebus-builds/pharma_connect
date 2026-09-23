@@ -1,50 +1,60 @@
 import jwt from "jsonwebtoken";
 
+const TOKEN_ISSUER = "pharmaconnect-web";
+const TOKEN_AUDIENCE = "pharmaconnect-realtime";
+const ROLES = ["PATIENT", "PHARMACY", "ADMIN"] as const;
+type Role = (typeof ROLES)[number];
+
 export interface WsUser {
   id: string;
   email: string;
-  role: "PATIENT" | "PHARMACY" | "ADMIN";
+  role: Role;
   pharmacyId: string | null;
   name: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function parseWsUser(value: unknown): WsUser | null {
+  if (!isRecord(value)) return null;
+
+  const id = typeof value.id === "string" ? value.id : typeof value.sub === "string" ? value.sub : null;
+  const role = value.role;
+  if (!id || typeof role !== "string" || !ROLES.includes(role as Role) || typeof value.email !== "string") {
+    return null;
+  }
+
+  const pharmacyId =
+    typeof value.pharmacyId === "string" ? value.pharmacyId : value.pharmacyId == null ? null : undefined;
+  if (pharmacyId === undefined) return null;
+
+  return {
+    id,
+    email: value.email,
+    role: role as Role,
+    pharmacyId,
+    name: typeof value.name === "string" ? value.name : "",
+  };
+}
+
 export function verifyToken(token: string): WsUser | null {
   const secret = process.env.NEXTAUTH_SECRET;
-  if (!secret) throw new Error("NEXTAUTH_SECRET not set");
+  if (!secret) return null;
+
   try {
-    // NextAuth JWT is encrypted with NEXTAUTH_SECRET via next-auth/jwt
-    // For microservice, we verify via jsonwebtoken if using custom JWT,
-    // fallback: decode without verify for development (WARNING: not secure)
-    // Production: share NEXTAUTH_SECRET and use next-auth/jwt decode on web to issue a short-lived access token
-    const decoded = jwt.verify(token, secret) as any;
-    return {
-      id: decoded.id || decoded.sub,
-      email: decoded.email,
-      role: decoded.role,
-      pharmacyId: decoded.pharmacyId ?? null,
-      name: decoded.name ?? "",
-    };
+    const decoded = jwt.verify(token, secret, {
+      algorithms: ["HS256"],
+      issuer: TOKEN_ISSUER,
+      audience: TOKEN_AUDIENCE,
+    });
+    return parseWsUser(decoded);
   } catch {
-    try {
-      // Fallback: try decoding next-auth JWT via jose (if using next-auth v4, token is JWE)
-      // For now, attempt base64 decode for dev
-      const payload = JSON.parse(Buffer.from(token.split(".")[1] || "", "base64").toString());
-      if (payload?.id || payload?.sub) {
-        return {
-          id: payload.id || payload.sub,
-          email: payload.email,
-          role: payload.role,
-          pharmacyId: payload.pharmacyId ?? null,
-          name: payload.name ?? "",
-        };
-      }
-    } catch {}
     return null;
   }
 }
 
-// Alternative: Verify via web API (most reliable, no secret sharing issues)
-// Call POST ${NEXTAUTH_URL}/api/auth/verify-ws with token and get user back
 export async function verifyViaWeb(token: string): Promise<WsUser | null> {
   const webUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
   try {
@@ -54,8 +64,10 @@ export async function verifyViaWeb(token: string): Promise<WsUser | null> {
       body: JSON.stringify({ token }),
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { user: WsUser };
-    return data.user as WsUser;
+
+    const data: unknown = await res.json();
+    if (!isRecord(data)) return null;
+    return parseWsUser(data.user);
   } catch {
     return null;
   }

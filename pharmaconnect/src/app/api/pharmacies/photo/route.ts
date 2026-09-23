@@ -29,7 +29,7 @@ export async function GET() {
 
 /** Upload (or replace) the pharmacy's profile / cover photo. Multipart: kind, file. */
 export async function POST(req: NextRequest) {
-  const limited = rateLimit(req, 10, 60_000);
+  const limited = await rateLimit(req, 10, 60_000);
   if (limited) return limited;
 
   try {
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
 
 /** Remove the pharmacy's profile / cover photo. */
 export async function DELETE(req: NextRequest) {
-  const limited = rateLimit(req, 10, 60_000);
+  const limited = await rateLimit(req, 10, 60_000);
   if (limited) return limited;
 
   try {

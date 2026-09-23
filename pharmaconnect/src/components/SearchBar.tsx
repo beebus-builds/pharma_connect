@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import toast from "react-hot-toast";
 import { Search, X, History, Pill, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -35,10 +36,14 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
   const [recentSearches, setRecentSearches] = useState<MedicineDTO[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const queryRef = useRef("");
 
   useEffect(() => {
     const saved = localStorage.getItem(RECENT_SEARCHES_KEY);
@@ -53,7 +58,9 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
 
   useEffect(() => {
     if (selected) {
-      setQuery(`${selected.genericName} (${selected.brandName})`);
+      const selectedQuery = `${selected.genericName} (${selected.brandName})`;
+      queryRef.current = selectedQuery;
+      setQuery(selectedQuery);
       setOpen(false);
       setActiveIndex(-1);
     }
@@ -70,6 +77,9 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
   }, []);
 
   useEffect(() => {
+    setNextCursor(null);
+    setHasMore(false);
+
     if (!query || (selected && query === `${selected.genericName} (${selected.brandName})`)) {
       setSuggestions([]);
       setActiveIndex(-1);
@@ -80,17 +90,24 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/medicines/search?q=${encodeURIComponent(query)}`, {
+        const params = new URLSearchParams({ q: query, limit: "15" });
+        const res = await fetch(`/api/medicines/search?${params.toString()}`, {
           signal: controller.signal,
         });
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Search failed");
         if (!controller.signal.aborted) {
           setSuggestions(data.medicines ?? []);
+          setNextCursor(data.pagination?.nextCursor ?? null);
+          setHasMore(Boolean(data.pagination?.hasMore));
           setActiveIndex(-1);
           setOpen(true);
         }
       } catch (err: any) {
-        if (err.name !== "AbortError") setSuggestions([]);
+        if (err.name !== "AbortError") {
+          setSuggestions([]);
+          toast.error(err.message || "Search failed");
+        }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -101,6 +118,29 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
       controller.abort();
     };
   }, [query, selected]);
+
+  const loadMore = useCallback(async () => {
+    if (!query || !nextCursor || loadingMore) return;
+    const requestedQuery = query;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ q: requestedQuery, limit: "15", cursor: nextCursor });
+      const res = await fetch(`/api/medicines/search?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Search failed");
+      if (queryRef.current !== requestedQuery) return;
+      setSuggestions((previous) => {
+        const existing = new Set(previous.map((medicine) => medicine.id));
+        return [...previous, ...(data.medicines ?? []).filter((medicine: MedicineDTO) => !existing.has(medicine.id))];
+      });
+      setNextCursor(data.pagination?.nextCursor ?? null);
+      setHasMore(Boolean(data.pagination?.hasMore));
+    } catch (err: any) {
+      toast.error(err.message || "Could not load more medicines");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, nextCursor, query]);
 
   const handleSelect = useCallback(
     (medicine: MedicineDTO) => {
@@ -169,8 +209,9 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
         <input
           ref={inputRef}
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
+           onChange={(e) => {
+             queryRef.current = e.target.value;
+             setQuery(e.target.value);
             if (onClear) onClear();
           }}
           onFocus={() => setOpen(true)}
@@ -189,8 +230,9 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
         {query && (
           <button
             type="button"
-            onClick={() => {
-              setQuery("");
+             onClick={() => {
+               queryRef.current = "";
+               setQuery("");
               setSuggestions([]);
               setActiveIndex(-1);
               onClear?.();
@@ -316,6 +358,16 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
                     </button>
                   ))}
                 </div>
+                {hasMore && nextCursor && (
+                  <button
+                    type="button"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="w-full border-t border-slate-100 dark:border-slate-700 px-4 py-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    {loadingMore ? "Loading more…" : "Show more medicines"}
+                  </button>
+                )}
               </div>
             )}
           </motion.div>

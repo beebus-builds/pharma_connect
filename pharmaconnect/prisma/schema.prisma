@@ -75,6 +75,7 @@ model Pharmacy {
   phone         String
   latitude      Float
   longitude     Float
+  location      Unsupported("geography(Point, 4326)")?
   licenseNumber String?
 
   stocks   PharmacyStock[]
@@ -93,6 +94,7 @@ model Pharmacy {
   createdAt DateTime @default(now())
 
   @@index([latitude, longitude])
+  @@index([location], type: Gist, map: "Pharmacy_location_gist_idx")
   @@index([name])
 }
 

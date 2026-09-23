@@ -7,7 +7,7 @@ import { createAdapter } from "@socket.io/redis-adapter";
 import Redis from "ioredis";
 import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
-import { verifyToken, verifyViaWeb } from "./auth";
+import { verifyToken, verifyViaWeb, type WsUser } from "./auth";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -73,8 +73,26 @@ const sendSchema = z.object({
   content: z.string().min(1).max(2000).trim(),
 });
 
+const conversationIdSchema = z.object({
+  conversationId: z.string().cuid(),
+});
+
+const typingSchema = conversationIdSchema.extend({
+  isTyping: z.boolean(),
+});
+
+async function canAccessConversation(conversationId: string, user: WsUser) {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { patientId: true, pharmacyId: true },
+  });
+  return Boolean(
+    conversation && (conversation.patientId === user.id || conversation.pharmacyId === user.pharmacyId)
+  );
+}
+
 io.on("connection", (socket) => {
-  const user = (socket as any).user as { id: string; role: string; pharmacyId: string | null; name: string };
+  const user = (socket as any).user as WsUser;
   console.log(`[realtime] connected ${user.id} (${user.role}) ${socket.id}`);
 
   // Join personal room for inbox updates
@@ -112,10 +130,11 @@ io.on("connection", (socket) => {
       // Send recent history (last 30)
       const messages = await prisma.message.findMany({
         where: { conversationId: conv.id },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
         take: 50,
         include: { sender: { select: { id: true, name: true } } },
       });
+      messages.reverse();
       socket.emit("history", messages);
       console.log(`[realtime] ${user.id} joined ${room}`);
     } catch (e: any) {
@@ -192,19 +211,49 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("typing", ({ conversationId, isTyping }: { conversationId: string; isTyping: boolean }) => {
-    socket.to(`conv:${conversationId}`).emit("typing", { userId: user.id, name: user.name, isTyping });
+  socket.on("typing", async (payload, ack?: (res: any) => void) => {
+    const parsed = typingSchema.safeParse(payload);
+    if (!parsed.success) {
+      if (ack) ack({ ok: false, error: "Invalid payload" });
+      return;
+    }
+
+    try {
+      const { conversationId, isTyping } = parsed.data;
+      if (!(await canAccessConversation(conversationId, user))) {
+        if (ack) ack({ ok: false, error: "Not authorized" });
+        return;
+      }
+      socket.to(`conv:${conversationId}`).emit("typing", { userId: user.id, name: user.name, isTyping });
+      if (ack) ack({ ok: true });
+    } catch (e) {
+      console.error("[typing] error", e);
+      if (ack) ack({ ok: false, error: "Unable to update typing status" });
+    }
   });
 
-  socket.on("mark_read", async ({ conversationId }: { conversationId: string }) => {
+  socket.on("mark_read", async (payload, ack?: (res: any) => void) => {
+    const parsed = conversationIdSchema.safeParse(payload);
+    if (!parsed.success) {
+      if (ack) ack({ ok: false, error: "Invalid payload" });
+      return;
+    }
+
     try {
+      const { conversationId } = parsed.data;
+      if (!(await canAccessConversation(conversationId, user))) {
+        if (ack) ack({ ok: false, error: "Not authorized" });
+        return;
+      }
       await prisma.message.updateMany({
         where: { conversationId, senderId: { not: user.id }, readAt: null },
         data: { readAt: new Date() },
       });
       io.to(`conv:${conversationId}`).emit("read", { conversationId, readerId: user.id });
+      if (ack) ack({ ok: true });
     } catch (e) {
       console.error("[mark_read] error", e);
+      if (ack) ack({ ok: false, error: "Unable to mark messages as read" });
     }
   });
 

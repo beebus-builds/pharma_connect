@@ -9,7 +9,7 @@ import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
   try {
-    const limited = rateLimit(req, 5, 60000);
+    const limited = await rateLimit(req, 5, 60000);
     if (limited) return limited;
 
     const body = await req.json();

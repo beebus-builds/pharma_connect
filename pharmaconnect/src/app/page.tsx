@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -14,11 +14,11 @@ import {
   useInView,
   animate,
 } from "framer-motion";
-import { 
-  MapPin, LocateFixed, Stethoscope, ShieldCheck, 
-  Clock, Star, Zap, Heart, PhoneCall, 
-  CheckCircle2, ArrowRight, MessageCircle, 
-  Award, Users, Globe, Search, Pill, Building2, ShieldAlert, Send, Navigation, SlidersHorizontal, List, Map as MapIcon
+import {
+  MapPin, LocateFixed, Stethoscope, ShieldCheck,
+  Clock, Star, Zap, Heart, PhoneCall,
+  CheckCircle2, ArrowRight, MessageCircle,
+  Award, Users, Globe, Search, Pill, Building2, ShieldAlert, Send, Navigation, SlidersHorizontal, List, Map as MapIcon, Leaf
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import PharmacyCard from "@/components/PharmacyCard";
@@ -29,6 +29,7 @@ import { Card } from "@/components/ui/Card";
 import Tilt3D from "@/components/ui/Tilt3D";
 import Hero3D from "@/components/ui/Hero3D";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useLiteMode } from "@/hooks/useLiteMode";
 import type { MedicineDTO, NearbyPharmacyDTO } from "@/types";
 import Link from "next/link";
 
@@ -77,7 +78,10 @@ const HomePage = () => {
   const { location, error, loading: locLoading, requestLocation, setManualLocation } = useGeolocation();
   const [medicine, setMedicine] = useState<MedicineDTO | null>(null);
   const [pharmacies, setPharmacies] = useState<NearbyPharmacyDTO[]>([]);
+  const [pharmacyCursor, setPharmacyCursor] = useState<string | null>(null);
+  const [hasMorePharmacies, setHasMorePharmacies] = useState(false);
   const [searching, setSearching] = useState(false);
+  const searchAbortRef = useRef<AbortController | null>(null);
   const [requestingId, setRequestingId] = useState<string | null>(null);
   const [radiusKm, setRadiusKm] = useState(5);
   const router = useRouter();
@@ -85,6 +89,20 @@ const HomePage = () => {
   const [activePharmacyId, setActivePharmacyId] = useState<string | null>(null);
   const pharmacyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const shouldReduceMotion = useReducedMotion();
+  const { lite, setMode } = useLiteMode();
+  const [stats, setStats] = useState<{ verifiedPharmacies: number; medicineCount: number } | null>(null);
+
+  // Real trust-bar counts — replaces hardcoded marketing numbers.
+  useEffect(() => {
+    fetch("/api/stats/public")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.verifiedPharmacies === "number") setStats(d);
+      })
+      .catch(() => {});
+  }, []);
+
+  const heavyVisuals = !lite && !shouldReduceMotion;
 
   // Hero parallax: cursor position normalized to -1..1, spring-smoothed
   const heroMx = useMotionValue(0);
@@ -99,7 +117,7 @@ const HomePage = () => {
   const blobY = useTransform(heroSy, [-1, 1], [-20, 20]);
 
   function handleHeroMouseMove(e: React.MouseEvent<HTMLElement>) {
-    if (shouldReduceMotion) return;
+    if (!heavyVisuals) return;
     const rect = e.currentTarget.getBoundingClientRect();
     heroMx.set(((e.clientX - rect.left) / rect.width) * 2 - 1);
     heroMy.set(((e.clientY - rect.top) / rect.height) * 2 - 1);
@@ -116,10 +134,10 @@ const HomePage = () => {
     requestLocation();
   }, []);
 
-  useEffect(() => {
-    if (!medicine || !location) return;
+  const fetchPharmacyPage = useCallback(
+    async (cursor: string | null, append: boolean, signal: AbortSignal) => {
+      if (!medicine || !location) return;
 
-    const fetchPharmacies = async () => {
       setSearching(true);
       try {
         const params = new URLSearchParams({
@@ -127,23 +145,58 @@ const HomePage = () => {
           lng: String(location.lng),
           medicineId: medicine.id,
           radiusKm: String(radiusKm),
+          limit: "20",
         });
-        const res = await fetch(`/api/pharmacies/nearby?${params.toString()}`);
+        if (cursor) params.set("cursor", cursor);
+
+        const res = await fetch(`/api/pharmacies/nearby?${params.toString()}`, { signal });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load pharmacies");
-        setPharmacies(data.pharmacies ?? []);
-        if ((data.pharmacies ?? []).length === 0) {
+
+        const next = (data.pharmacies ?? []) as NearbyPharmacyDTO[];
+        setPharmacies((previous) => {
+          if (!append) return next;
+          const existing = new Set(previous.map((pharmacy) => pharmacy.id));
+          return [...previous, ...next.filter((pharmacy) => !existing.has(pharmacy.id))];
+        });
+        setPharmacyCursor(data.pagination?.nextCursor ?? null);
+        setHasMorePharmacies(Boolean(data.pagination?.hasMore));
+
+        if (!append && next.length === 0) {
           toast("No nearby pharmacies currently have this medicine in stock", { icon: "ℹ️" });
         }
       } catch (e: any) {
-        toast.error(e.message || "Something went wrong");
+        if (e.name !== "AbortError") toast.error(e.message || "Something went wrong");
       } finally {
-        setSearching(false);
+        if (!signal.aborted) setSearching(false);
       }
-    };
+    },
+    [medicine, location, radiusKm]
+  );
 
-    fetchPharmacies();
-  }, [medicine, location, radiusKm]);
+  useEffect(() => {
+    searchAbortRef.current?.abort();
+    setSearching(false);
+    setPharmacies([]);
+    setPharmacyCursor(null);
+    setHasMorePharmacies(false);
+
+    if (!medicine || !location) return;
+
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    void fetchPharmacyPage(null, false, controller.signal);
+
+    return () => controller.abort();
+  }, [fetchPharmacyPage, medicine, location, radiusKm]);
+
+  const loadMorePharmacies = useCallback(() => {
+    if (!hasMorePharmacies || !pharmacyCursor || searching) return;
+    const controller = new AbortController();
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = controller;
+    void fetchPharmacyPage(pharmacyCursor, true, controller.signal);
+  }, [fetchPharmacyPage, hasMorePharmacies, pharmacyCursor, searching]);
 
   async function handleRequest(pharmacy: NearbyPharmacyDTO) {
     if (!session) {
@@ -183,12 +236,12 @@ const HomePage = () => {
         <motion.div
           className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900 to-primary-900/30"
           aria-hidden="true"
-          style={shouldReduceMotion ? undefined : { x: blobX, y: blobY, scale: 1.08 }}
+          style={heavyVisuals ? { x: blobX, y: blobY, scale: 1.08 } : undefined}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.06),transparent_50%)]" aria-hidden="true" />
 
-        {/* Floating depth chips (desktop only, decorative) */}
-        {!shouldReduceMotion && (
+        {/* Floating depth chips (desktop only, decorative, skipped in lite mode) */}
+        {heavyVisuals && (
           <>
             <motion.div
               aria-hidden="true"
@@ -216,10 +269,12 @@ const HomePage = () => {
           </>
         )}
 
-        {/* 3D centerpiece (WebGL, desktop+ only; degrades to CSS pill) */}
+        {/* 3D centerpiece (WebGL, desktop+ only; skipped in lite mode) */}
+        {!lite && (
         <div className="hidden lg:block absolute inset-y-0 right-0 w-[46%] z-0">
           <Hero3D className="h-full w-full" />
         </div>
+        )}
 
         <div className="relative z-10 max-w-6xl mx-auto px-4">
           {session ? (
@@ -278,6 +333,16 @@ const HomePage = () => {
                 </button>
               )}
             </div>
+            {/* Lite-mode toggle for 2G / budget phones */}
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <button
+                onClick={() => setMode(!lite)}
+                aria-pressed={lite}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/20 bg-white/10 text-slate-200 hover:bg-white/20 transition-colors"
+              >
+                <Leaf className="h-3.5 w-3.5" /> {lite ? "Lite mode on — faster" : "Lite mode"}
+              </button>
+            </div>
             {/* Radius chips - only show when medicine selected */}
             {medicine && (
               <div className="mt-3 flex items-center gap-2">
@@ -306,18 +371,16 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* 2. Quick Stats - Trust Bar */}
+      {/* 2. Quick Stats - real counts, no marketing fluff */}
       <section className="max-w-6xl mx-auto px-4 w-full -mt-6 sm:-mt-8 relative z-20">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {[
-            { label: "Verified Pharmacies", value: "500+", icon: <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-blue-500" },
-            { label: "Medicine Types", value: "10k+", icon: <Pill className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-indigo-500" },
-            { label: "Daily Searches", value: "2k+", icon: <Search className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-emerald-500" },
-            { label: "Patients Helped", value: "50k+", icon: <Users className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-amber-500" },
+            { label: "Verified Pharmacies", value: stats ? String(stats.verifiedPharmacies) : "—", icon: <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-blue-500" },
+            { label: "Medicine Types", value: stats ? `${Math.round(stats.medicineCount / 100) / 10}k+` : "—", icon: <Pill className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-indigo-500" },
           ].map((stat, i) => (
-            <Tilt3D key={i} maxTilt={10} className="rounded-2xl">
+            <Tilt3D key={i} maxTilt={10} disabled={lite} className="rounded-2xl">
               <motion.div
-                whileHover={shouldReduceMotion ? {} : { y: -6 }}
+                whileHover={heavyVisuals ? { y: -6 } : {}}
                 className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl shadow-lg sm:shadow-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center h-full"
               >
                 <div className={`${stat.color} text-white p-2.5 sm:p-3 rounded-xl mb-3 sm:mb-4 shadow-lg`}>{stat.icon}</div>
@@ -438,6 +501,16 @@ const HomePage = () => {
                 ))}
               </div>
             )}
+            {!searching && hasMorePharmacies && pharmacyCursor && (
+              <Button
+                variant="outline"
+                className="w-full rounded-xl"
+                onClick={loadMorePharmacies}
+                disabled={searching}
+              >
+                Load more pharmacies
+              </Button>
+            )}
           </div>
 
           <div className={`lg:col-span-7 h-[420px] sm:h-[520px] lg:h-[600px] lg:sticky lg:top-20 rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl relative ${activeTab === "list" ? "hidden lg:block" : "block"}`}>
@@ -466,120 +539,6 @@ const HomePage = () => {
               </div>
             )}
           </div>
-        </div>
-      </section>
-
-      {/* 4. Features - Glassmorphism Design */}
-      <section className="relative py-24 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-slate-100 dark:bg-slate-900/30 -z-10" />
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-20">
-            <motion.h2 {...fadeIn} className="text-4xl font-black mb-4">Engineered for Efficiency</motion.h2>
-            <motion.p {...fadeIn} transition={{ delay: 0.2 }} className="text-slate-500 max-w-2xl mx-auto text-lg">
-              We&apos;ve removed the friction from healthcare. No more phone calls, no more wasted trips.
-            </motion.p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { 
-                title: "Real-time Inventory", 
-                desc: "Direct sync with pharmacy stock levels ensures you get accurate data instantly.",
-                icon: <Zap className="h-6 w-6" />,
-                color: "from-amber-400 to-orange-500"
-              },
-              { 
-                title: "Precise Geolocation", 
-                desc: "Powered by advanced mapping to find the absolute closest option for urgent needs.",
-                icon: <MapPin className="h-6 w-6" />,
-                color: "from-blue-400 to-indigo-500"
-              },
-              { 
-                title: "Direct Request Line", 
-                desc: "Bridge the gap by requesting out-of-stock medicines directly from your preferred shop.",
-                icon: <Send className="h-6 w-6" />,
-                color: "from-emerald-400 to-teal-500"
-              },
-            ].map((feat, i) => (
-              <Tilt3D key={i} maxTilt={6} className="h-full">
-                <motion.div 
-                  {...fadeIn} 
-                  transition={{ delay: i * 0.2 }}
-                  className="h-full"
-                >
-                  <Card className="p-8 h-full border-none shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t-4 border-primary-600">
-                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feat.color} text-white flex items-center justify-center mb-8 shadow-lg`}>
-                      {feat.icon}
-                    </div>
-                    <h3 className="text-2xl font-bold mb-4">{feat.title}</h3>
-                    <p className="text-slate-500 leading-relaxed text-lg">{feat.desc}</p>
-                  </Card>
-                </motion.div>
-              </Tilt3D>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Testimonials - Modern Social Proof */}
-      <section className="max-w-6xl mx-auto px-4 w-full">
-        <div className="text-center mb-16">
-          <motion.div {...fadeIn} className="inline-block p-2 bg-primary-100 text-primary-600 rounded-lg text-xs font-bold uppercase tracking-widest mb-4">
-            User Stories
-          </motion.div>
-          <motion.h2 {...fadeIn} transition={{ delay: 0.1 }} className="text-4xl font-black mb-4">Trusted by Thousands</motion.h2>
-          <motion.p {...fadeIn} transition={{ delay: 0.2 }} className="text-slate-500 max-w-2xl mx-auto text-lg">
-            Join the community of patients and pharmacists making healthcare accessible in Nepal.
-          </motion.p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-8">
-          {[
-            { 
-              name: "Suman Thapa", 
-              role: "Patient", 
-              text: "PharmaConnect saved me from visiting five different stores for my father's insulin. It is a lifesaver for anyone with chronic conditions.",
-              rating: 5,
-              avatar: "ST"
-            },
-            { 
-              name: "Dr. Anita Sharma", 
-              role: "Pharmacy Owner", 
-              text: "It helps us understand the local demand better. We now stock items that patients actually need, reducing wastage.",
-              rating: 5,
-              avatar: "AS"
-            },
-            { 
-              name: "Rajesh Gupta", 
-              role: "Patient", 
-              text: "The map view is so intuitive. I can find the nearest option in seconds without making a single phone call.",
-              rating: 4,
-              avatar: "RG"
-            },
-          ].map((t, i) => (
-            <motion.div key={i} {...fadeIn} transition={{ delay: i * 0.2 }}>
-              <Card className="p-8 h-full flex flex-col justify-between border-none shadow-xl bg-white dark:bg-slate-900 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
-                  <MessageCircle className="h-20 w-20 text-primary-600" />
-                </div>
-                <div>
-                  <div className="flex gap-1 text-amber-400 mb-6">
-                    {Array.from({ length: t.rating }).map((_, j) => <Star key={j} className="h-5 w-5 fill-current" />)}
-                  </div>
-                  <p className="text-slate-600 dark:text-slate-300 text-lg italic mb-8 leading-relaxed relative z-10">
-                    &quot;{t.text}&quot;
-                  </p>
-                </div>
-                <div className="flex items-center gap-4 border-t pt-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold shadow-md">
-                    {t.avatar}
-                  </div>
-                  <div>
-                    <p className="font-black text-slate-900 dark:text-white">{t.name}</p>
-                    <p className="text-xs font-medium text-slate-500 uppercase">{t.role}</p>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
         </div>
       </section>
 
@@ -627,60 +586,6 @@ const HomePage = () => {
                 Detailed User Guide
               </Button>
             </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. Value Proposition - Asymmetrical Modern Grid */}
-      <section className="max-w-6xl mx-auto px-4 w-full py-20">
-        <div className="grid lg:grid-cols-2 gap-20 items-center">
-          <div className="relative order-2 lg:order-1">
-            <div className="absolute -inset-8 bg-primary-500/10 rounded-full blur-3xl"></div>
-            <div className="relative grid grid-cols-2 gap-6">
-              <Card className="p-6 bg-white dark:bg-slate-900 shadow-2xl rotate-2 hover:rotate-0 transition-transform duration-300 border-b-4 border-red-500">
-                <Heart className="h-8 w-8 text-red-500 mb-4" />
-                <h4 className="font-bold text-lg mb-1">Patient Centric</h4>
-                <p className="text-xs text-slate-500">Reducing the stress of medicine hunting.</p>
-              </Card>
-              <Card className="p-6 bg-white dark:bg-slate-900 shadow-2xl -rotate-3 hover:rotate-0 transition-transform duration-300 border-b-4 border-blue-500 mt-12">
-                <Clock className="h-8 w-8 text-blue-500 mb-4" />
-                <h4 className="font-bold text-lg mb-1">Time Optimized</h4>
-                <p className="text-xs text-slate-500">Saving hours of travel time per search.</p>
-              </Card>
-              <Card className="p-6 bg-white dark:bg-slate-900 shadow-2xl -rotate-1 hover:rotate-0 transition-transform duration-300 border-b-4 border-yellow-500">
-                <Award className="h-8 w-8 text-yellow-500 mb-4" />
-                <h4 className="font-bold text-lg mb-1">Verified Data</h4>
-                <p className="text-xs text-slate-500">Validated pharmacy license records.</p>
-              </Card>
-              <Card className="p-6 bg-white dark:bg-slate-900 shadow-2xl rotate-6 hover:rotate-0 transition-transform duration-300 border-b-4 border-green-500 mt-12">
-                <Globe className="h-8 w-8 text-green-500 mb-4" />
-                <h4 className="font-bold text-lg mb-1">City Wide</h4>
-                <p className="text-xs text-slate-500">Expanding coverage across all districts.</p>
-              </Card>
-            </div>
-          </div>
-          <div className="order-1 lg:order-2">
-            <motion.div {...fadeIn}>
-              <h2 className="text-4xl font-black mb-8 leading-tight">Redefining <br /><span className="text-primary-600">Medicine Access</span> in Nepal</h2>
-              <p className="text-slate-600 dark:text-slate-400 mb-10 text-lg leading-relaxed">
-                Finding a specific brand or generic medicine can be a nightmare. PharmaConnect bridges the gap between pharmacies and patients through real-time data sharing.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
-                  "Instant stock visibility",
-                  "Distance-based sorting",
-                  "Direct pharmacy requests",
-                  "Verified pharmacy network",
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                    <div className="bg-green-100 text-green-600 rounded-full p-1">
-                      <CheckCircle2 className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm font-semibold">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
           </div>
         </div>
       </section>
@@ -760,4 +665,3 @@ const HomePage = () => {
 };
 
 export default HomePage;
-

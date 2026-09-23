@@ -10,8 +10,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params;
     const { searchParams } = new URL(req.url);
-    const lat = Number(searchParams.get("lat"));
-    const lng = Number(searchParams.get("lng"));
+    const latParam = searchParams.get("lat");
+    const lngParam = searchParams.get("lng");
+    const lat = latParam?.trim() ? Number(latParam) : Number.NaN;
+    const lng = lngParam?.trim() ? Number(lngParam) : Number.NaN;
     const hasLocation = isValidLatLng(lat, lng);
 
     const pharmacy = await prisma.pharmacy.findUnique({

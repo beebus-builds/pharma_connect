@@ -94,24 +94,37 @@ export function useChatSocket(requestId?: string, conversationId?: string) {
     };
   }, [session, requestId, conversationId, getToken]);
 
+  const sendViaHttp = useCallback(
+    async (content: string) => {
+      if (!requestId) throw new Error("No conversation");
+
+      const res = await fetch(`/api/requests/${requestId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send");
+      return data.message as ChatMessage;
+    },
+    [requestId]
+  );
+
   const send = useCallback(
-    (content: string) =>
-      new Promise<ChatMessage>((resolve, reject) => {
-        if (!socketRef.current || !activeConversationId) {
-          // Fallback: send via requestId if conversation not yet created
-          if (!requestId) return reject(new Error("No conversation"));
-          socketRef.current?.emit("send", { requestId, content }, (res: any) => {
-            if (res?.ok) resolve(res.message);
-            else reject(new Error(res?.error || "Failed to send"));
-          });
-          return;
-        }
-        socketRef.current.emit("send", { conversationId: activeConversationId, content }, (res: any) => {
+    async (content: string) => {
+      const socket = socketRef.current;
+      if (!socket?.connected || !activeConversationId) return sendViaHttp(content);
+
+      return new Promise<ChatMessage>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Message send timed out")), 10000);
+        socket.emit("send", { conversationId: activeConversationId, content }, (res: any) => {
+          clearTimeout(timeout);
           if (res?.ok) resolve(res.message);
           else reject(new Error(res?.error || "Failed to send"));
         });
-      }),
-    [activeConversationId, requestId]
+      });
+    },
+    [activeConversationId, sendViaHttp]
   );
 
   const sendTyping = useCallback(

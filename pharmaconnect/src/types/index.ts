@@ -1,5 +1,11 @@
 export type StockStatus = "in-stock" | "low-stock" | "out-of-stock";
 
+export interface PaginationDTO {
+  limit: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
 export interface MedicineDTO {
   id: string;
   genericName: string;
@@ -21,6 +27,7 @@ export interface NearbyPharmacyDTO {
   stockStatus: StockStatus;
   mrp: number | null;
   expiryDate: string | null;
+  stockUpdatedAt: string | null;
   profileImageUrl: string | null;
   coverImageUrl: string | null;
   medicine: MedicineDTO;

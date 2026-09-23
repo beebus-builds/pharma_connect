@@ -11,7 +11,7 @@ import { rateLimit } from "@/lib/rateLimit";
  * Duplicate (generic + brand + strength + manufacturer) returns the existing row.
  */
 export async function POST(req: NextRequest) {
-  const limited = rateLimit(req, 20, 60_000);
+  const limited = await rateLimit(req, 20, 60_000);
   if (limited) return limited;
 
   try {

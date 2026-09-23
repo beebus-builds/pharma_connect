@@ -45,3 +45,19 @@ export function stockStatus(
   if (quantity <= lowThreshold) return "low-stock";
   return "in-stock";
 }
+
+/** Human "xh ago" label for stock freshness. Pure, never throws. */
+export function formatRelativeTime(iso: string | null | undefined, now = Date.now()): string {
+  if (!iso) return "Updated recently";
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "Updated recently";
+  const diffMs = Math.max(0, now - t);
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "Updated just now";
+  if (mins < 60) return `Updated ${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Updated ${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `Updated ${days}d ago`;
+  return `Updated on ${new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+}
