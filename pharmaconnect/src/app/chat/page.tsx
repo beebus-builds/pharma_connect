@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/components/Providers";
 import Link from "next/link";
 import { MessageCircle, Search } from "lucide-react";
 import ChatInbox, { InboxItem } from "@/components/chat/ChatInbox";

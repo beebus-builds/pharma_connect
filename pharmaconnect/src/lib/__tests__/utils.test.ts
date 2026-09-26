@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { haversineDistanceKm, formatDistance, stockStatus, formatRelativeTime } from "../utils";
+import { parseLiteModePreference, shouldUseLiteMode } from "../../hooks/useLiteMode";
 
 describe("Utils", () => {
   it("calculates Haversine distance correctly", () => {
@@ -35,5 +36,27 @@ describe("Utils", () => {
     expect(formatRelativeTime(new Date(now - 5 * 60000).toISOString(), now)).toBe("Updated 5m ago");
     expect(formatRelativeTime(new Date(now - 3 * 3600000).toISOString(), now)).toBe("Updated 3h ago");
     expect(formatRelativeTime(new Date(now - 2 * 86400000).toISOString(), now)).toBe("Updated 2d ago");
+  });
+});
+
+describe("Lite mode", () => {
+  it("parses only valid persisted preferences", () => {
+    expect(parseLiteModePreference("1")).toBe(true);
+    expect(parseLiteModePreference("0")).toBe(false);
+    expect(parseLiteModePreference("true")).toBeNull();
+    expect(parseLiteModePreference(null)).toBeNull();
+  });
+
+  it.each([
+    { saveData: true, effectiveType: "4g", smallScreen: false },
+    { saveData: false, effectiveType: "slow-2g", smallScreen: false },
+    { saveData: false, effectiveType: "2g", smallScreen: false },
+    { saveData: false, effectiveType: "4g", smallScreen: true },
+  ])("recommends lite mode for constrained connections", (connection) => {
+    expect(shouldUseLiteMode(connection)).toBe(true);
+  });
+
+  it("keeps full mode on unconstrained desktop connections", () => {
+    expect(shouldUseLiteMode({ saveData: false, effectiveType: "4g", smallScreen: false })).toBe(false);
   });
 });

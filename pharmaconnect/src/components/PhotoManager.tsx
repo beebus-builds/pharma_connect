@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { useSession } from "next-auth/react";
-import toast from "react-hot-toast";
+import { useSession } from "@/components/Providers";
+import { appToast as toast } from "@/components/Providers";
 import { Camera, ImagePlus, Trash2, ExternalLink, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";

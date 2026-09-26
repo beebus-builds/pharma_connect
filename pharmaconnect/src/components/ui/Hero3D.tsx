@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
-import { useReducedMotion } from "framer-motion";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 // WebGL bundle is only fetched on the client when actually rendered
-const Hero3DScene = dynamic(() => import("./Hero3DScene"), { ssr: false });
+const Hero3DScene = lazy(() => import("./Hero3DScene"));
 
 function supportsWebGL(): boolean {
   try {
@@ -24,7 +22,9 @@ function supportsWebGL(): boolean {
  *  - off-screen     -> frameloop paused so the GPU idles
  */
 export default function Hero3D({ className }: { className?: string }) {
-  const shouldReduceMotion = useReducedMotion();
+  const [reduceMotion] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const [webgl, setWebgl] = useState<boolean | null>(null); // null = not yet checked
   const [inView, setInView] = useState(false);
@@ -45,7 +45,7 @@ export default function Hero3D({ className }: { className?: string }) {
   }, []);
 
   // Reduced-motion users get the static CSS pill, never an animation loop
-  const showScene = webgl === true && inView && !shouldReduceMotion;
+  const showScene = webgl === true && inView && !reduceMotion;
 
   return (
     <div
@@ -54,7 +54,9 @@ export default function Hero3D({ className }: { className?: string }) {
       aria-hidden="true"
     >
       {showScene ? (
-        <Hero3DScene paused={!inView} />
+        <Suspense fallback={null}>
+          <Hero3DScene paused={!inView} />
+        </Suspense>
       ) : (
         // Static fallback: CSS-only pill, also shown before WebGL check resolves
         <div className="flex h-full w-full items-center justify-center">

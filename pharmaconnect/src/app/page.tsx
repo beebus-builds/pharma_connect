@@ -1,24 +1,20 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "@/components/Providers";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 import {
-  motion,
-  AnimatePresence,
-  useReducedMotion,
-  useMotionValue,
-  useSpring,
-  useTransform,
-  useInView,
-  animate,
-} from "framer-motion";
-import {
-  MapPin, LocateFixed, Stethoscope, ShieldCheck,
-  Clock, Star, Zap, Heart, PhoneCall,
-  CheckCircle2, ArrowRight, MessageCircle,
-  Award, Users, Globe, Search, Pill, Building2, ShieldAlert, Send, Navigation, SlidersHorizontal, List, Map as MapIcon, Leaf
+  MapPin,
+  LocateFixed,
+  Search,
+  Pill,
+  Building2,
+  ShieldAlert,
+  Navigation,
+  SlidersHorizontal,
+  List,
+  Map as MapIcon,
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import PharmacyCard from "@/components/PharmacyCard";
@@ -33,41 +29,12 @@ import { useLiteMode } from "@/hooks/useLiteMode";
 import type { MedicineDTO, NearbyPharmacyDTO } from "@/types";
 import Link from "next/link";
 
-const fadeIn = {
-  initial: { opacity: 0, y: 20 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true },
-  transition: { duration: 0.6 }
-};
+const HomepageDetails = lazy(() => import("@/components/HomepageDetails"));
 
-/** Animated number that counts up when scrolled into view. */
 function CountUp({ value, label }: { value: string; label: string }) {
-  const m = value.match(/^(\D*)([\d,.]+)(.*)$/);
-  const prefix = m?.[1] ?? "";
-  const suffix = m?.[3] ?? "";
-  const target = m ? parseFloat(m[2].replace(/,/g, "")) : 0;
-  const decimals = m && m[2].includes(".") ? m[2].split(".")[1].length : 0;
-  const valid = Boolean(m);
-
-  const raw = useMotionValue(0);
-  const display = useTransform(raw, (v) =>
-    `${prefix}${v.toLocaleString(undefined, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    })}${suffix}`
-  );
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-40px" });
-
-  useEffect(() => {
-    if (!inView || !valid) return;
-    const controls = animate(raw, target, { duration: 1.4, ease: "easeOut" });
-    return controls.stop;
-  }, [inView, valid, raw, target]);
-
   return (
-    <span ref={ref}>
-      <motion.span>{valid ? display : value}</motion.span>
+    <span>
+      {value}
       <span className="sr-only">{label}</span>
     </span>
   );
@@ -88,8 +55,7 @@ const HomePage = () => {
   const [activeTab, setActiveTab] = useState<"list" | "map">("list");
   const [activePharmacyId, setActivePharmacyId] = useState<string | null>(null);
   const pharmacyRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const shouldReduceMotion = useReducedMotion();
-  const { lite, setMode } = useLiteMode();
+  const { lite, ready: liteModeReady } = useLiteMode();
   const [stats, setStats] = useState<{ verifiedPharmacies: number; medicineCount: number } | null>(null);
 
   // Real trust-bar counts — replaces hardcoded marketing numbers.
@@ -102,26 +68,10 @@ const HomePage = () => {
       .catch(() => {});
   }, []);
 
-  const heavyVisuals = !lite && !shouldReduceMotion;
-
-  // Hero parallax: cursor position normalized to -1..1, spring-smoothed
-  const heroMx = useMotionValue(0);
-  const heroMy = useMotionValue(0);
-  const heroSx = useSpring(heroMx, { stiffness: 60, damping: 20 });
-  const heroSy = useSpring(heroMy, { stiffness: 60, damping: 20 });
-  const chip1X = useTransform(heroSx, [-1, 1], [-20, 20]);
-  const chip1Y = useTransform(heroSy, [-1, 1], [-14, 14]);
-  const chip2X = useTransform(heroSx, [-1, 1], [16, -16]);
-  const chip2Y = useTransform(heroSy, [-1, 1], [12, -12]);
-  const blobX = useTransform(heroSx, [-1, 1], [-30, 30]);
-  const blobY = useTransform(heroSy, [-1, 1], [-20, 20]);
-
-  function handleHeroMouseMove(e: React.MouseEvent<HTMLElement>) {
-    if (!heavyVisuals) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    heroMx.set(((e.clientX - rect.left) / rect.width) * 2 - 1);
-    heroMy.set(((e.clientY - rect.top) / rect.height) * 2 - 1);
-  }
+  const heavyVisuals = liteModeReady && !lite;
+  const mapAvailable = liteModeReady && !lite;
+  const activeView = lite ? "list" : activeTab;
+  const listVisible = !mapAvailable || activeView === "list";
 
   // Scroll the corresponding list card into view when a pin is clicked on the map
   useEffect(() => {
@@ -229,23 +179,18 @@ const HomePage = () => {
   return (
     <div className="flex flex-col gap-16 sm:gap-24 pb-20 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
       {/* 1. Hero Section */}
-      <section
-        className="relative pt-10 sm:pt-16 pb-10 sm:pb-14 bg-slate-900 text-white overflow-hidden"
-        onMouseMove={handleHeroMouseMove}
-      >
-        <motion.div
+      <section className="relative pt-10 sm:pt-16 pb-10 sm:pb-14 bg-slate-900 text-white overflow-hidden">
+        <div
           className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900 to-primary-900/30"
           aria-hidden="true"
-          style={heavyVisuals ? { x: blobX, y: blobY, scale: 1.08 } : undefined}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.06),transparent_50%)]" aria-hidden="true" />
 
         {/* Floating depth chips (desktop only, decorative, skipped in lite mode) */}
         {heavyVisuals && (
           <>
-            <motion.div
+            <div
               aria-hidden="true"
-              style={{ x: chip1X, y: chip1Y }}
               className="hidden lg:flex absolute top-24 right-[8%] z-20 items-center gap-2 bg-white/10 border border-white/15 backdrop-blur-md rounded-2xl px-4 py-3 shadow-2xl pointer-events-none"
             >
               <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse" />
@@ -254,10 +199,9 @@ const HomePage = () => {
                 <p className="text-[10px] text-emerald-300 leading-tight">In stock · 1.2 km</p>
               </div>
               <Pill className="h-4 w-4 text-primary-300" />
-            </motion.div>
-            <motion.div
+            </div>
+            <div
               aria-hidden="true"
-              style={{ x: chip2X, y: chip2Y }}
               className="hidden lg:flex absolute bottom-16 right-[22%] z-20 items-center gap-2 bg-white/10 border border-white/15 backdrop-blur-md rounded-2xl px-4 py-3 shadow-2xl pointer-events-none"
             >
               <MapPin className="h-4 w-4 text-blue-300" />
@@ -265,12 +209,12 @@ const HomePage = () => {
                 <p className="text-xs font-bold leading-tight">4 pharmacies nearby</p>
                 <p className="text-[10px] text-slate-300 leading-tight">Within 5 km radius</p>
               </div>
-            </motion.div>
+            </div>
           </>
         )}
 
         {/* 3D centerpiece (WebGL, desktop+ only; skipped in lite mode) */}
-        {!lite && (
+        {heavyVisuals && (
         <div className="hidden lg:block absolute inset-y-0 right-0 w-[46%] z-0">
           <Hero3D className="h-full w-full" />
         </div>
@@ -278,7 +222,7 @@ const HomePage = () => {
 
         <div className="relative z-10 max-w-6xl mx-auto px-4">
           {session ? (
-            <motion.div initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 max-w-3xl">
+            <div className="space-y-5 max-w-3xl animate-slideUp motion-reduce:animate-none">
               <p className="inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase bg-white/10 px-3 py-1.5 rounded-full border border-white/10">
                 <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" aria-hidden="true" /> Welcome back
               </p>
@@ -292,15 +236,15 @@ const HomePage = () => {
                   <Button variant="outline" className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur">How it works</Button>
                 </Link>
               </div>
-            </motion.div>
+            </div>
           ) : (
             <div className="text-center max-w-3xl mx-auto">
-              <motion.h1 initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-4">
+              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-4 animate-slideUp motion-reduce:animate-none">
                 Find Your <span className="text-primary-300">Medicine</span> Nearby
-              </motion.h1>
-              <motion.p initial={shouldReduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="text-slate-300 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+              </h1>
+              <p className="text-slate-300 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed animate-fadeIn motion-reduce:animate-none">
                 Real-time stock from verified pharmacies across Nepal. No more calls — just search, find, and go.
-              </motion.p>
+              </p>
             </div>
           )}
            
@@ -332,16 +276,6 @@ const HomePage = () => {
                   <Navigation className="h-3.5 w-3.5" /> Enable location for nearest results
                 </button>
               )}
-            </div>
-            {/* Lite-mode toggle for 2G / budget phones */}
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <button
-                onClick={() => setMode(!lite)}
-                aria-pressed={lite}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/20 bg-white/10 text-slate-200 hover:bg-white/20 transition-colors"
-              >
-                <Leaf className="h-3.5 w-3.5" /> {lite ? "Lite mode on — faster" : "Lite mode"}
-              </button>
             </div>
             {/* Radius chips - only show when medicine selected */}
             {medicine && (
@@ -379,16 +313,13 @@ const HomePage = () => {
             { label: "Medicine Types", value: stats ? `${Math.round(stats.medicineCount / 100) / 10}k+` : "—", icon: <Pill className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-indigo-500" },
           ].map((stat, i) => (
             <Tilt3D key={i} maxTilt={10} disabled={lite} className="rounded-2xl">
-              <motion.div
-                whileHover={heavyVisuals ? { y: -6 } : {}}
-                className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl shadow-lg sm:shadow-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center h-full"
-              >
+              <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl shadow-lg sm:shadow-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center h-full">
                 <div className={`${stat.color} text-white p-2.5 sm:p-3 rounded-xl mb-3 sm:mb-4 shadow-lg`}>{stat.icon}</div>
                 <div className="text-2xl sm:text-3xl font-black mb-1 text-slate-900 dark:text-white">
                   <CountUp value={stat.value} label={stat.label} />
                 </div>
                 <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest leading-tight">{stat.label}</div>
-              </motion.div>
+              </div>
             </Tilt3D>
           ))}
         </div>
@@ -397,7 +328,7 @@ const HomePage = () => {
       {/* 3. Search Results */}
       <section className="max-w-7xl mx-auto px-4 w-full" aria-live="polite" aria-busy={searching}>
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-          <motion.div {...fadeIn} className="min-w-0">
+          <div className="min-w-0 animate-fadeIn motion-reduce:animate-none">
             <h2 className="text-2xl sm:text-3xl font-black flex items-center gap-3">
               <span className="p-2 bg-primary-600 text-white rounded-xl shadow-md shrink-0"><Pill className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" /></span>
               <span className="truncate">
@@ -417,16 +348,18 @@ const HomePage = () => {
                 )}
               </p>
             )}
-          </motion.div>
+          </div>
           <div className="flex items-center gap-2 shrink-0">
-            <div className="lg:hidden flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl" role="tablist" aria-label="View mode">
-              <button role="tab" aria-selected={activeTab === "list"} onClick={() => setActiveTab("list")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 ${activeTab === "list" ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-white" : "text-slate-500"}`}>
-                <List className="h-4 w-4" aria-hidden="true" /> List {pharmacies.length > 0 && `(${pharmacies.length})`}
-              </button>
-              <button role="tab" aria-selected={activeTab === "map"} onClick={() => setActiveTab("map")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 ${activeTab === "map" ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-white" : "text-slate-500"}`}>
-                <MapIcon className="h-4 w-4" aria-hidden="true" /> Map
-              </button>
-            </div>
+            {mapAvailable && (
+              <div className="lg:hidden flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl" role="tablist" aria-label="View mode">
+                <button role="tab" aria-selected={activeView === "list"} onClick={() => setActiveTab("list")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 ${activeView === "list" ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-white" : "text-slate-500"}`}>
+                  <List className="h-4 w-4" aria-hidden="true" /> List {pharmacies.length > 0 && `(${pharmacies.length})`}
+                </button>
+                <button role="tab" aria-selected={activeView === "map"} onClick={() => setActiveTab("map")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 ${activeView === "map" ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-white" : "text-slate-500"}`}>
+                  <MapIcon className="h-4 w-4" aria-hidden="true" /> Map
+                </button>
+              </div>
+            )}
             {medicine && !location && !locLoading && (
               <span className="hidden lg:inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-full border border-amber-200 dark:border-amber-900">
                 <MapPin className="h-3 w-3" /> Enable location for accurate distance
@@ -435,12 +368,12 @@ const HomePage = () => {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-6 lg:gap-10">
-          <div className={`lg:col-span-5 space-y-4 ${activeTab === "map" ? "hidden lg:block" : "block"}`}>
+        <div className={`grid gap-6 lg:gap-10 ${mapAvailable ? "lg:grid-cols-12" : ""}`}>
+          <div className={`${mapAvailable ? "lg:col-span-5" : ""} space-y-4 ${listVisible ? "block" : "hidden lg:block"}`}>
             {searching && <ListSkeleton count={3} />}
 
             {!searching && medicine && pharmacies.length === 0 && (
-              <motion.div {...(shouldReduceMotion ? {} : fadeIn)}>
+              <div className="animate-fadeIn motion-reduce:animate-none">
                 <Card className="p-8 sm:p-10 text-center space-y-5 border-dashed border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
                   <div className="bg-slate-50 dark:bg-slate-800 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto">
                     <ShieldAlert className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400" aria-hidden="true" />
@@ -460,7 +393,7 @@ const HomePage = () => {
                     <Button variant="outline" className="rounded-full px-6">Learn How to Request Stock</Button>
                   </Link>
                 </Card>
-              </motion.div>
+              </div>
             )}
 
             {!searching && !medicine && pharmacies.length === 0 && (
@@ -473,13 +406,12 @@ const HomePage = () => {
             )}
 
             {!searching && (
-              <div className="space-y-3 sm:space-y-4 max-h-[70vh] lg:max-h-[600px] overflow-y-auto pr-1 -mr-1">
+              <div className={`space-y-3 sm:space-y-4 ${lite ? "overflow-visible" : "max-h-[70vh] lg:max-h-[600px] overflow-y-auto pr-1 -mr-1"}`}>
                 {pharmacies.map((p, i) => (
-                  <motion.div 
-                    key={p.id} 
-                    initial={shouldReduceMotion ? false : { opacity: 0, x: -12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: shouldReduceMotion ? 0 : i * 0.05 }}
+                  <div
+                    key={p.id}
+                    className={lite ? "" : "animate-slideUp motion-reduce:animate-none"}
+                    style={lite ? undefined : { animationDelay: `${i * 50}ms` }}
                   >
                     <div
                       ref={(el) => {
@@ -495,9 +427,10 @@ const HomePage = () => {
                         canRequest={!session || session.user.role === "PATIENT"}
                         highlighted={activePharmacyId === p.id}
                         userLocation={location}
+                        lite={lite}
                       />
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             )}
@@ -513,153 +446,42 @@ const HomePage = () => {
             )}
           </div>
 
-          <div className={`lg:col-span-7 h-[420px] sm:h-[520px] lg:h-[600px] lg:sticky lg:top-20 rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl relative ${activeTab === "list" ? "hidden lg:block" : "block"}`}>
-            <MapViewClient
-              userLocation={location}
-              pharmacies={pharmacies}
-              activePharmacyId={activePharmacyId}
-              onSelectPharmacy={setActivePharmacyId}
-            />
-            {!medicine && (
-              <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px] z-10 flex items-center justify-center p-4 sm:p-6 text-center">
-                <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-sm w-full">
-                  <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/40 text-primary-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                    <Search className="h-6 w-6" aria-hidden="true" />
-                  </div>
-                  <h3 className="text-lg font-bold mb-1.5">Search to visualize</h3>
-                  <p className="text-slate-500 text-sm mb-4">Enter a medicine name to see available pharmacies on the interactive map.</p>
-                  <p className="text-xs font-semibold text-primary-600">↑ Use the search bar above</p>
-                </div>
-              </div>
-            )}
-            {medicine && pharmacies.length > 0 && (
-              <div className="absolute bottom-3 left-3 right-3 sm:left-4 sm:right-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur px-3 py-2 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-medium flex items-center gap-2 z-10">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" aria-hidden="true" />
-                {pharmacies.length} pharmacies · {medicine.genericName}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* 6. How it Works - Visual Timeline */}
-      <section className="bg-primary-900 text-white py-24 overflow-hidden relative">
-        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white rounded-full blur-[120px]"></div>
-        </div>
-        <div className="max-w-6xl mx-auto px-4 relative z-10">
-          <div className="text-center mb-20">
-            <motion.h2 {...fadeIn} className="text-4xl font-black mb-4">The Path to Your Medicine</motion.h2>
-            <motion.p {...fadeIn} transition={{ delay: 0.1 }} className="text-primary-200 max-w-2xl mx-auto text-lg">
-              Three simple steps to ensure you never leave a pharmacy empty-handed.
-            </motion.p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-16 relative">
-            {/* Visual Connector Line (Desktop) */}
-            <div className="hidden md:block absolute top-16 left-0 w-full h-1 bg-white/10 z-0"></div>
-            
-            {[
-              { step: "01", title: "Instant Search", desc: "Use our smart search to find generic or brand name medicines available in your city.", icon: <Search className="h-8 w-8" /> },
-              { step: "02", title: "Smart Mapping", desc: "Instantly visualize the closest pharmacies on an interactive map with precise distances.", icon: <MapPin className="h-8 w-8" /> },
-              { step: "03", title: "Quick Acquisition", desc: "Visit the store with confidence or request stock for future availability.", icon: <CheckCircle2 className="h-8 w-8" /> },
-            ].map((s, i) => (
-              <motion.div 
-                key={i} 
-                {...fadeIn} 
-                transition={{ delay: i * 0.2 }}
-                className="text-center relative z-10 group"
-              >
-                <div className="relative inline-block mb-8">
-                  <div className="absolute -top-6 -left-6 text-6xl font-black text-white/10 group-hover:text-white/20 transition">{s.step}</div>
-                  <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center backdrop-blur-xl border border-white/20 group-hover:bg-white group-hover:text-primary-700 transition-all duration-500 shadow-2xl">
-                    {s.icon}
+          {mapAvailable && (
+            <div className={`lg:col-span-7 h-[420px] sm:h-[520px] lg:h-[600px] lg:sticky lg:top-20 rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl relative ${activeView === "list" ? "hidden lg:block" : "block"}`}>
+              <MapViewClient
+                userLocation={location}
+                pharmacies={pharmacies}
+                activePharmacyId={activePharmacyId}
+                onSelectPharmacy={setActivePharmacyId}
+              />
+              {!medicine && (
+                <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px] z-10 flex items-center justify-center p-4 sm:p-6 text-center">
+                  <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-sm w-full">
+                    <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/40 text-primary-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                      <Search className="h-6 w-6" aria-hidden="true" />
+                    </div>
+                    <h3 className="text-lg font-bold mb-1.5">Search to visualize</h3>
+                    <p className="text-slate-500 text-sm mb-4">Enter a medicine name to see available pharmacies on the interactive map.</p>
+                    <p className="text-xs font-semibold text-primary-600">↑ Use the search bar above</p>
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold mb-3">{s.title}</h3>
-                <p className="text-primary-100 text-base leading-relaxed opacity-80">{s.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-          <div className="mt-20 text-center">
-            <Link href="/how-it-works">
-              <Button variant="secondary" className="px-10 py-6 rounded-full text-lg font-bold shadow-xl hover:scale-105 transition">
-                Detailed User Guide
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* 8. FAQ - Clean Minimalist Accordion Style */}
-      <section className="bg-slate-100 dark:bg-slate-900/50 py-24">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <motion.h2 {...fadeIn} className="text-4xl font-black mb-4">Common Questions</motion.h2>
-            <motion.p {...fadeIn} transition={{ delay: 0.1 }} className="text-slate-500 text-lg">Everything you need to know about using PharmaConnect.</motion.p>
-          </div>
-          <div className="space-y-4">
-            {[
-              { q: "Is this service free for patients?", a: "Absolutely. PharmaConnect is a free public utility aimed at improving healthcare accessibility for every citizen of Nepal." },
-              { q: "How accurate is the stock information?", a: "We use direct updates from pharmacy owners. While we strive for 100% accuracy, we always recommend a quick phone call using the number provided in the app before visiting." },
-              { q: "Can I order medicines online?", a: "No. To ensure safety and regulatory compliance, we only provide availability data. Purchase and pickup must happen directly at the pharmacy." },
-              { q: "How can a pharmacy join the network?", a: "Owners can register via the 'Join as Pharmacy' section. Our team reviews the license number before enabling the pharmacy's profile." },
-            ].map((faq, i) => (
-              <motion.div 
-                key={i} 
-                {...fadeIn} 
-                transition={{ delay: i * 0.1 }}
-                className="group"
-              >
-                <Card className="p-6 border-none shadow-sm bg-white dark:bg-slate-900 hover:shadow-md transition-all duration-300 overflow-hidden relative">
-                  <div className="flex items-start justify-between gap-4">
-                    <h4 className="font-bold text-lg pr-4">{faq.q}</h4>
-                    <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-primary-600 transition-colors" />
-                  </div>
-                  <p className="text-slate-500 mt-4 leading-relaxed text-sm">{faq.a}</p>
-                  <div className="absolute bottom-0 left-0 h-1 w-0 bg-primary-600 group-hover:w-full transition-all duration-500"></div>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 9. CTA - High Contrast Conversion Zone */}
-        <section className="max-w-6xl mx-auto px-4 w-full pb-20">
-          <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-blue-800 rounded-[3rem] p-12 md:p-20 text-center text-white relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-48 -mt-48"></div>
-            <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl -ml-48 -mb-48"></div>
-            <div className="relative z-10">
-              <motion.h2 
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                className="text-4xl sm:text-6xl font-black mb-8 leading-tight"
-              >
-                Stop Searching. <br />Start Finding.
-              </motion.h2>
-              <motion.p 
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="text-primary-100 max-w-2xl mx-auto mb-12 text-xl opacity-90"
-              >
-                Join the healthcare revolution in Nepal. Experience the fastest way to locate essential medicines.
-              </motion.p>
-              <div className="flex flex-wrap justify-center gap-6">
-                <Link href="/">
-                  <Button variant="secondary" className="px-10 py-7 text-lg font-black rounded-full shadow-xl hover:scale-105 transition">
-                    Find Medicine Now
-                  </Button>
-                </Link>
-                <Link href="/register">
-                  <Button variant="outline" className="px-10 py-7 text-lg font-black rounded-full bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm transition hover:scale-105">
-                    Join as Pharmacy
-                  </Button>
-                </Link>
-              </div>
+              )}
+              {medicine && pharmacies.length > 0 && (
+                <div className="absolute bottom-3 left-3 right-3 sm:left-4 sm:right-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur px-3 py-2 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-medium flex items-center gap-2 z-10">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" aria-hidden="true" />
+                  {pharmacies.length} pharmacies · {medicine.genericName}
+                </div>
+              )}
             </div>
-          </div>
-        </section>
+          )}
+        </div>
+      </section>
+
+      {liteModeReady && !lite && (
+        <Suspense fallback={null}>
+          <HomepageDetails />
+        </Suspense>
+      )}
       </div>
     );
 };

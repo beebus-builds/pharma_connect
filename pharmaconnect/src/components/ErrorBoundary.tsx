@@ -1,7 +1,6 @@
 "use client";
 
 import React, { Component, ErrorInfo, ReactNode } from "react";
-import * as Sentry from "@sentry/nextjs";
 import { Button } from "./ui/Button";
 
 interface Props {
@@ -23,7 +22,10 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
+    if (document.documentElement.dataset.liteMode === "true") return;
+    void import("@sentry/nextjs").then(({ captureException }) => {
+      captureException(error, { extra: { componentStack: errorInfo.componentStack } });
+    });
   }
 
   public render() {

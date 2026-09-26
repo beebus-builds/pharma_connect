@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Stethoscope, UserRound, Building2, Check, Eye, EyeOff } from "lucide-react";

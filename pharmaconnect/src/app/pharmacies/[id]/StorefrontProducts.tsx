@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 import { Search, Send, CheckCircle2, Pill } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";

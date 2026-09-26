@@ -1,0 +1,7 @@
+# Local agent/editor worktrees and tool state
+.kilo/
+.freebuff/
+
+# Windows cruft
+Thumbs.db
+desktop.ini

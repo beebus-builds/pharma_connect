@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/components/Providers";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 import { ArrowLeft, BadgeCheck, Building2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 import { KeyRound } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";

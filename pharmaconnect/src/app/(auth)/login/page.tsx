@@ -2,10 +2,11 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn, useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
+import { useSession } from "@/components/Providers";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 import Link from "next/link";
 import { Stethoscope, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { loginSchema, type LoginInput } from "@/lib/validations";

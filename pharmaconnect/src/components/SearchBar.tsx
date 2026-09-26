@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 import { Search, X, History, Pill, Trash2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { MedicineDTO } from "@/types";
 
@@ -246,14 +245,9 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
         )}
       </div>
 
-      <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.18 }}
-            className="absolute z-50 mt-2 w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl overflow-hidden max-h-[460px] flex flex-col"
+          <div
+            className="absolute z-50 mt-2 w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl overflow-hidden max-h-[460px] flex flex-col animate-slideUp motion-reduce:animate-none"
             role="region"
             aria-label="Search suggestions"
           >
@@ -370,9 +364,8 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
                 )}
               </div>
             )}
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
     </div>
   );
 }

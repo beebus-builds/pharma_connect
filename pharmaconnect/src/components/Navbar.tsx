@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "@/components/Providers";
 import { useState, useEffect, useRef } from "react";
-import { Moon, Sun, Stethoscope, LogOut, LayoutDashboard, User, HelpCircle, Menu, X, Settings, MessageCircle } from "lucide-react";
+import { Moon, Sun, Stethoscope, LogOut, LayoutDashboard, User, HelpCircle, Menu, X, Settings, MessageCircle, Leaf } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
+import { useLiteMode } from "@/hooks/useLiteMode";
 
 export default function Navbar() {
-  const { data: session, status } = useSession();
+  const { data: session, status, signOut } = useSession();
   const { theme, toggleTheme } = useTheme();
+  const { lite, ready: liteReady, setMode: setLiteMode } = useLiteMode();
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -74,10 +76,10 @@ export default function Navbar() {
       </Link>
       <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
       <div className="flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-0 border-slate-100 dark:border-slate-800">
-        <Link href={dashboardHref} className="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs font-bold hover:ring-2 hover:ring-primary-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 shrink-0" title={session.user.name ?? ""} aria-label="Go to dashboard">
+        <Link href={dashboardHref} className="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs font-bold hover:ring-2 hover:ring-primary-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 shrink-0" title={session?.user.name ?? ""} aria-label="Go to dashboard">
           {initials || "U"}
         </Link>
-        <span className="text-sm font-medium truncate sm:hidden flex-1">{session.user.name}</span>
+        <span className="text-sm font-medium truncate sm:hidden flex-1">{session?.user.name}</span>
         <button
           onClick={() => signOut({ callbackUrl: "/" })}
           className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/20 ml-auto sm:ml-0"
@@ -122,6 +124,21 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => setLiteMode(!lite)}
+              disabled={!liteReady}
+              aria-label={`${lite ? "Disable" : "Enable"} lite mode`}
+              aria-pressed={lite}
+              title={`${lite ? "Disable" : "Enable"} lite mode`}
+              className={`p-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 disabled:cursor-wait disabled:opacity-50 ${
+                lite
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                  : "hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              <Leaf className="h-4 w-4" />
+            </button>
+
             <button
               onClick={toggleTheme}
               aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}

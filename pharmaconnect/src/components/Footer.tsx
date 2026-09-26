@@ -5,7 +5,7 @@ import { Globe, MessageCircle, PhoneCall, Mail } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useState } from "react";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 
 export default function Footer() {
   const [email, setEmail] = useState("");

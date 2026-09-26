@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/components/Providers";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { LayoutDashboard, Pill, Building2, Users, ShieldAlert, ArrowRight, Flag } from "lucide-react";

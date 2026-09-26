@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 import { Clock, Search, Inbox, Filter, ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";

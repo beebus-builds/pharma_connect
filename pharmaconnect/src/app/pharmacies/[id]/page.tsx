@@ -11,6 +11,7 @@ import { isValidLatLng } from "@/lib/geo";
 import { effectiveThreshold, isExpired } from "@/lib/inventory";
 import { viberUrl, whatsappUrl } from "@/lib/contact";
 import { VerifiedBadge } from "@/components/ui/Badge";
+import ShareButtons from "@/components/ShareButtons";
 import StorefrontProducts from "./StorefrontProducts";
 import type { PharmacyStorefrontDTO } from "@/types";
 
@@ -71,15 +72,25 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const storefront = await getStorefront(id);
   if (!storefront) return { title: "Pharmacy not found — PharmaConnect" };
+  const canonical = `${(process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "")}/pharmacies/${storefront.id}`;
+  const description = `Browse ${storefront.inStockCount} in-stock medicines at ${storefront.name}, ${storefront.address}. Request stock and chat directly.`;
   return {
     title: `${storefront.name} — products & stock | PharmaConnect`,
-    description: `Browse ${storefront.inStockCount} in-stock medicines at ${storefront.name}, ${storefront.address}. Request stock and chat directly.`,
+    description,
+    alternates: { canonical },
     openGraph: {
       title: `${storefront.name} on PharmaConnect`,
       description: `${storefront.inStockCount} medicines in stock · ${storefront.address}`,
+      url: canonical,
+      type: "website",
       ...(storefront.coverImageUrl || storefront.profileImageUrl
         ? { images: [storefront.coverImageUrl ?? storefront.profileImageUrl!] }
         : {}),
+    },
+    twitter: {
+      card: "summary",
+      title: `${storefront.name} on PharmaConnect`,
+      description: `${storefront.inStockCount} medicines in stock · ${storefront.address}`,
     },
   };
 }
@@ -192,6 +203,10 @@ export default async function PharmacyStorefrontPage({ params, searchParams }: P
             Viber
           </a>
         )}
+        <ShareButtons
+          url={`${(process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "")}/pharmacies/${storefront.id}`}
+          title={`${storefront.name} on PharmaConnect`}
+        />
       </div>
 
       {/* Products listed under this pharmacy's name */}

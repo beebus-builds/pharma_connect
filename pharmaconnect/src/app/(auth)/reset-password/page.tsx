@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 import { LockKeyhole } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";

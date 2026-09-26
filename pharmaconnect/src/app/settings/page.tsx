@@ -1,13 +1,13 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/components/Providers";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { User, Lock, Mail, Save, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();

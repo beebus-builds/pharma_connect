@@ -5,5 +5,7 @@ node_modules
 dist
 *.log
 .DS_Store
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
 # Local dev photo uploads (production uses Vercel Blob)
 /public/uploads/*

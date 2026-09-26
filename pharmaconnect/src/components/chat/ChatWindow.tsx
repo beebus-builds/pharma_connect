@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Loader2, Wifi, WifiOff } from "lucide-react";
 import { useChatSocket } from "@/hooks/useChatSocket";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/components/Providers";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 

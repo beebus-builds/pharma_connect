@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 import { motion } from "framer-motion";
 import { Plus, PackageCheck, Pill, ClipboardList, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Search, Minus, MessageCircle, ImagePlus, Trash2 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";

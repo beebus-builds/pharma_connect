@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/components/Providers";
 import Link from "next/link";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import ChatWindow from "@/components/chat/ChatWindow";

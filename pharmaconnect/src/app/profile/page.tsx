@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/components/Providers";
 import { useRouter } from "next/navigation";
 import { User, MapPin, Phone, Mail, ShieldCheck, Building2, BadgeCheck } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/Badge";
 import { VerifiedBadge } from "@/components/ui/Badge";
 import GoogleMapView from "@/components/GoogleMapView";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();

@@ -11,4 +11,10 @@ export default [
       "react-hooks/refs": "warn",
     },
   },
+  {
+    files: ["src/components/PharmacyCard.tsx"],
+    rules: {
+      "@next/next/no-img-element": "off",
+    },
+  },
 ];

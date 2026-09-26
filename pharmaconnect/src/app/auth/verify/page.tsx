@@ -6,7 +6,7 @@ import { CheckCircle, XCircle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
-import toast from "react-hot-toast";
+import { appToast as toast } from "@/components/Providers";
 
 export default function VerifyPage() {
   const router = useRouter();

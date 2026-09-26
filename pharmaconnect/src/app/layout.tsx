@@ -1,27 +1,40 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-import "leaflet/dist/leaflet.css";
 import Providers from "@/components/Providers";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PageWrapper from "@/components/PageWrapper";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { getSiteUrl } from "@/lib/seo";
 
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-inter",
-});
+const siteUrl = getSiteUrl();
 
 export const metadata: Metadata = {
-  title: "PharmaConnect - Find Medicines Near You",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "PharmaConnect - Find Medicines Near You",
+    template: "%s | PharmaConnect",
+  },
   description: "Nepal's platform to search medicines and find the nearest pharmacy with stock in hand.",
+  alternates: { canonical: siteUrl },
+  openGraph: {
+    type: "website",
+    siteName: "PharmaConnect",
+    title: "PharmaConnect - Find Medicines Near You",
+    description: "Search medicines and find the nearest pharmacy with stock in hand across Nepal.",
+    url: siteUrl,
+  },
+  twitter: {
+    card: "summary",
+    title: "PharmaConnect - Find Medicines Near You",
+    description: "Search medicines and find the nearest pharmacy with stock in hand across Nepal.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable} data-scroll-behavior="smooth">
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 antialiased font-sans">
         <Providers>
           <Navbar />

@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/components/Providers";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
-import { MapPin, Phone, Send, CheckCircle2, Clock, MessageCircle, PhoneCall, Flag, Store, ChevronDown } from "lucide-react";
-import { motion } from "framer-motion";
+import { appToast as toast } from "@/components/Providers";
+import { MapPin, Phone, Send, CheckCircle2, Clock, MessageCircle, PhoneCall, Flag, Store, ChevronDown, Facebook } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { StockBadge, DistanceBadge, VerifiedBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
+import { facebookShareUrl } from "@/lib/seo";
 import { viberUrl, whatsappUrl } from "@/lib/contact";
 import type { NearbyPharmacyDTO } from "@/types";
 
@@ -33,6 +32,7 @@ interface PharmacyCardProps {
   highlighted?: boolean;
   /** Current user location — used to show distance on the storefront page. */
   userLocation?: { lat: number; lng: number } | null;
+  lite?: boolean;
 }
 
 export default function PharmacyCard({
@@ -42,6 +42,7 @@ export default function PharmacyCard({
   canRequest = true,
   highlighted = false,
   userLocation = null,
+  lite = false,
 }: PharmacyCardProps) {
   const [isSent, setIsSent] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -138,8 +139,16 @@ export default function PharmacyCard({
           aria-label={`View ${pharmacy.name} storefront`}
           title="View all products from this pharmacy"
         >
-          {pharmacy.profileImageUrl ? (
-            <Image src={pharmacy.profileImageUrl} alt={pharmacy.name} fill className="object-cover" sizes="44px" />
+          {pharmacy.profileImageUrl && !lite ? (
+            <img
+              src={pharmacy.profileImageUrl}
+              alt=""
+              width={44}
+              height={44}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
           ) : (
             <Store className="h-5 w-5 text-primary-600" aria-hidden="true" />
           )}
@@ -205,10 +214,10 @@ export default function PharmacyCard({
             aria-label={isSent ? "Request sent" : `Request ${pharmacy.medicine.genericName} from ${pharmacy.name}`}
           >
             {isSent ? (
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 Sent
-              </motion.div>
+              </div>
             ) : (
               <>
                 <Send className="h-3.5 w-3.5" />
@@ -258,6 +267,18 @@ export default function PharmacyCard({
                 <PhoneCall className="h-3.5 w-3.5" /> Viber
               </a>
             )}
+            <a
+              href={facebookShareUrl(
+                typeof window !== "undefined"
+                  ? `${window.location.origin}/pharmacies/${pharmacy.id}`
+                  : `/pharmacies/${pharmacy.id}`
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              <Facebook className="h-3.5 w-3.5 text-[#1877F2]" /> Share
+            </a>
           </div>
         </details>
       </div>
