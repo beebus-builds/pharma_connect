@@ -6,26 +6,119 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: postgresql://ci:ci@localhost:5432/pharmaconnect
+  DIRECT_URL: postgresql://ci:ci@localhost:5432/pharmaconnect
+  NEXTAUTH_SECRET: ci-placeholder-secret
+  NEXTAUTH_URL: http://localhost:3000
+  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  NEXT_TELEMETRY_DISABLED: "1"
+
 jobs:
-  build:
+  # ── Web app: lint, types, unit tests, migrations, production build ──────────
+  web:
+    name: web (next.js)
     runs-on: ubuntu-latest
+
+    services:
+      # postgis image ships PostGIS + pg_trgm + contrib, which every migration needs.
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: pharmaconnect
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci -d pharmaconnect"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+
     defaults:
       run:
         working-directory: pharmaconnect
-    env:
-      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
-      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
-      NEXTAUTH_SECRET: ci-placeholder-secret
-      NEXTAUTH_URL: http://localhost:3000
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: pharmaconnect/package-lock.json
+
       - run: npm ci
-      - run: npm run lint
-      - run: npx tsc --noEmit
-      - run: npm test
-      - run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      # Gates the SPECS inspection rule: "prisma migrate applies cleanly on a fresh
+      # DB". This also catches hand-written migration SQL that only looks right.
+      - name: Migrations apply on a fresh database
+        run: npx prisma migrate deploy
+
+      # Drift guard: the migration history and the schema must converge exactly.
+      # `migrate diff` normalizes the datamodel, so it needs its own empty database.
+      - name: Prisma schema is in sync with migrations
+        run: |
+          docker exec "$POSTGRES_CONTAINER" psql -U ci -d pharmaconnect \
+            -c "CREATE DATABASE pharmaconnect_shadow;"
+          npx prisma migrate diff --exit-code \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "postgresql://ci:ci@localhost:5432/pharmaconnect_shadow"
+
+      - name: Seed
+        run: npm run seed
+
+      - name: Build
+        run: npm run build
+
+      # SPECS 3B: lite-mode homepage transfer budget. Reads the build output that
+      # the previous step just produced.
+      - name: Homepage bundle budget
+        run: npm run check:bundle
+
+  # ── Realtime service: it is excluded from the web tsconfig, so it needs its own
+  #     typecheck, tests and build or it rots silently. ────────────────────────
+  realtime:
+    name: realtime (socket.io)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pharmaconnect/realtime
+    env:
+      NEXTAUTH_SECRET: ci-placeholder-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: pharmaconnect/realtime/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build

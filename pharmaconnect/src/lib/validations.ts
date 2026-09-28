@@ -179,8 +179,9 @@ export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 
 export const newsletterSubscribeSchema = z.object({
   email: z.string().trim().email("Enter a valid email address").max(254),
-  // Honeypot: real people never fill a field they cannot see.
-  website: z.string().max(0).optional(),
+  // Honeypot: a hidden field real people never fill. Deliberately unbounded so a
+  // bot that fills it still passes validation and gets a bland success response.
+  website: z.string().optional(),
 });
 
 export type NewsletterSubscribeInput = z.infer<typeof newsletterSubscribeSchema>;

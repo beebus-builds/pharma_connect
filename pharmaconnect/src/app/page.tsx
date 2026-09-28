@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useSession } from "@/components/Providers";
 import { useRouter, useSearchParams } from "next/navigation";
 import { appToast as toast } from "@/components/Providers";
@@ -18,12 +19,10 @@ import {
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import PharmacyCard from "@/components/PharmacyCard";
-import MapViewClient from "@/components/MapViewClient";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import Tilt3D from "@/components/ui/Tilt3D";
-import Hero3D from "@/components/ui/Hero3D";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useLiteMode } from "@/hooks/useLiteMode";
 import { useLocale } from "@/components/LocaleProvider";
@@ -31,6 +30,11 @@ import type { MedicineDTO, NearbyPharmacyDTO } from "@/types";
 import Link from "next/link";
 
 const HomepageDetails = lazy(() => import("@/components/HomepageDetails"));
+// Both of these are only ever rendered when lite mode is off. A plain runtime
+// `lite` check is not enough — the module still ships in the critical path — so
+// they are dynamic imports. See scripts/check-bundle-budget.mjs.
+const MapViewClient = dynamic(() => import("@/components/MapViewClient"), { ssr: false });
+const Hero3D = dynamic(() => import("@/components/ui/Hero3D"), { ssr: false });
 
 function CountUp({ value, label }: { value: string; label: string }) {
   return (

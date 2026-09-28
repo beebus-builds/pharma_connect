@@ -8,12 +8,15 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
     "icons:generate": "node scripts/generate-icons.mjs",
+    "check:bundle": "node scripts/check-bundle-budget.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -46,7 +49,10 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@tailwindcss/typography": "^0.5.20",
+    "@tailwindcss/typography": "^0.5.16",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/leaflet": "^1.9.14",
@@ -55,11 +61,13 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.37.0",
     "eslint-config-next": "^16.2.10",
+    "jsdom": "^30.1.1",
     "postcss": "^8.4.49",
-    "sharp": "^0.35.5",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.14",
     "tsx": "^4.19.2",
     "vitest": "^4.1.10"
