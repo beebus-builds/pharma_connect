@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { legalSupportEmail } from "@/lib/legal";
 
 export const metadata = {
   title: "Privacy Policy - PharmaConnect",
@@ -6,8 +7,6 @@ export const metadata = {
 };
 
 const EFFECTIVE_DATE = "September 2, 2026";
-const SUPPORT_EMAIL = "support@pharmaconnect.com.np"; // TODO: replace with your real support inbox
-const BUSINESS_NAME = "PharmaConnect"; // TODO: replace with your registered business/entity name
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -15,6 +14,22 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-3">{title}</h2>
       <div className="text-slate-600 dark:text-slate-300 leading-relaxed space-y-3">{children}</div>
     </section>
+  );
+}
+
+function SupportEmail() {
+  const supportEmail = legalSupportEmail();
+  if (!supportEmail) {
+    return (
+      <span className="text-amber-700 dark:text-amber-400">
+        (no support email has been published for this deployment yet)
+      </span>
+    );
+  }
+  return (
+    <a className="text-primary-600 hover:underline" href={`mailto:${supportEmail}`}>
+      {supportEmail}
+    </a>
   );
 }
 
@@ -29,6 +44,7 @@ export default function PrivacyPage() {
           <li>Account data: name, email, password (stored as a salted hash), and role (patient or pharmacy).</li>
           <li>Pharmacy data: business name, address, phone number, geographic coordinates, and license number.</li>
           <li>Usage data: medicine search queries, availability requests, and chat messages you send through the Service.</li>
+          <li>Newsletter data: if you subscribe in the footer, we store your email address and language choice so we can send product updates. Unsubscribe at any time.</li>
           <li>Payment metadata: transaction ID, amount, and status for any payments you make. We never see or store your card, bank, or wallet credentials — those are collected and processed directly by our payment gateway, Khalti.</li>
           <li>Technical data: IP address and basic request logs, used for security, rate limiting, and abuse prevention.</li>
         </ul>
@@ -39,6 +55,7 @@ export default function PrivacyPage() {
           <li>To operate the core Service: matching patients with pharmacies, showing map results, and enabling chat.</li>
           <li>To authenticate you and protect accounts against unauthorized access.</li>
           <li>To send transactional email (e.g. email verification) and, if you opt in, product updates.</li>
+          <li>To show pharmacies aggregated, anonymous demand signals (for example &ldquo;12 people searched X near you this week&rdquo;). These counts are never broken down to an individual patient.</li>
           <li>To detect abuse, enforce rate limits, and maintain the security and reliability of the Service.</li>
         </ul>
         <p>We do not sell your personal data.</p>
@@ -63,12 +80,10 @@ export default function PrivacyPage() {
           is required for legal, tax, or fraud-prevention purposes (for example, payment transaction records).
         </p>
       </Section>
-
       <Section title="5. Your rights">
         <p>
           You may request a copy of the personal data we hold about you, ask us to correct inaccurate data, or
-          request deletion of your account and associated data, by emailing{" "}
-          <a className="text-primary-600 hover:underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+          request deletion of your account and associated data, by emailing <SupportEmail />.
         </p>
       </Section>
 
@@ -100,8 +115,7 @@ export default function PrivacyPage() {
 
       <Section title="10. Contact">
         <p>
-          Questions about this policy or your data can be sent to{" "}
-          <a className="text-primary-600 hover:underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+          Questions about this policy or your data can be sent to <SupportEmail />.
         </p>
       </Section>
 

@@ -164,3 +164,24 @@ export const medicineCreateSchema = z.object({
 });
 
 export type MedicineCreateInput = z.infer<typeof medicineCreateSchema>;
+
+export const userUpdateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Name must be at least 2 characters").max(100).optional(),
+    password: z.string().min(6, "Password must be at least 6 characters").max(100, "Password is too long").optional(),
+  })
+  .strict()
+  .refine((data) => data.name !== undefined || data.password !== undefined, {
+    message: "No fields to update",
+  });
+
+export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
+
+export const newsletterSubscribeSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address").max(254),
+  // Honeypot: real people never fill a field they cannot see.
+  website: z.string().max(0).optional(),
+});
+
+export type NewsletterSubscribeInput = z.infer<typeof newsletterSubscribeSchema>;
+

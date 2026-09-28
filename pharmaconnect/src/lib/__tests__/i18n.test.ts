@@ -39,6 +39,55 @@ describe("i18n (Phase 3C)", () => {
     expect(translate("ne", "home.listView")).toBe("सूची");
     expect(translate("ne", "search.placeholder")).toContain("औषधि");
   });
+
+  it("keeps every English key present in the Nepali dictionary", () => {
+    const enKeys = Object.keys(getDictionary("en")).sort();
+    const neKeys = Object.keys(getDictionary("ne")).sort();
+    expect(neKeys).toEqual(enKeys);
+  });
+
+  it("keeps placeholders identical across locales", () => {
+    // Dedupe: a template with two plural branches repeats its placeholders.
+    const placeholders = (s: string) => [...new Set(s.match(/\{\w+\}/g) ?? [])].sort();
+    for (const key of Object.keys(getDictionary("en")) as MessageKey[]) {
+      const en = getDictionary("en")[key];
+      const ne = getDictionary("ne")[key];
+      expect(`${key}:${placeholders(ne).join(",")}`).toBe(`${key}:${placeholders(en).join(",")}`);
+    }
+  });
+
+  it("keeps Nepali entries non-empty and distinct from the English source", () => {
+    for (const [key, ne] of Object.entries(getDictionary("ne"))) {
+      expect(ne, `${key} is empty in Nepali`).toBeTruthy();
+    }
+  });
+
+  it("translates the surfaces SPECS 3C requires (homepage, search, badges)", () => {
+    // The acceptance criterion is "full homepage + auth + search flow readable
+    // in Nepali", so these must not silently fall through to English.
+    const en = getDictionary("en");
+    for (const key of [
+      "home.detectingLocation",
+      "home.enableLocation",
+      "home.empty.title",
+      "home.start.title",
+      "home.mapOverlay.title",
+      "home.loadMore",
+      "badge.inStock",
+      "badge.lowStock",
+      "badge.outOfStock",
+      "badge.verified",
+      "details.title",
+      "details.faqTitle",
+      "report.title",
+      "report.submit",
+      "offline.title",
+      "footer.subscribe",
+    ] as MessageKey[]) {
+      expect(getDictionary("ne")[key], `${key} not translated`).toBeTruthy();
+      expect(getDictionary("ne")[key], `${key} identical to English`).not.toBe(en[key]);
+    }
+  });
 });
 
 describe("PWA assets (Phase 3A)", () => {

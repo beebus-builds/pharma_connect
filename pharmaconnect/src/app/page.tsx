@@ -2,7 +2,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/components/Providers";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { appToast as toast } from "@/components/Providers";
 import {
   MapPin,
@@ -41,9 +41,11 @@ function CountUp({ value, label }: { value: string; label: string }) {
   );
 }
 
-const HomePage = () => {
+const HomePageContent = () => {
   const { data: session } = useSession();
-  const { location, error, loading: locLoading, requestLocation, setManualLocation } = useGeolocation();
+  const { location, error, loading: locLoading, requestLocation } = useGeolocation();
+  const searchParams = useSearchParams();
+  const deepLinkQuery = (searchParams.get("q") ?? "").trim();
   const [medicine, setMedicine] = useState<MedicineDTO | null>(null);
   const [pharmacies, setPharmacies] = useState<NearbyPharmacyDTO[]>([]);
   const [pharmacyCursor, setPharmacyCursor] = useState<string | null>(null);
@@ -58,6 +60,10 @@ const HomePage = () => {
   const pharmacyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { lite, ready: liteModeReady } = useLiteMode();
   const { t } = useLocale();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const [stats, setStats] = useState<{ verifiedPharmacies: number; medicineCount: number } | null>(null);
 
   // Real trust-bar counts — replaces hardcoded marketing numbers.
@@ -85,6 +91,28 @@ const HomePage = () => {
   useEffect(() => {
     requestLocation();
   }, []);
+
+  // `?q=` deep link (e.g. the "Find it near you" CTA on /medicines/[generic]).
+  // Resolve the term to a real catalog row and drive the normal search flow.
+  useEffect(() => {
+    if (!deepLinkQuery) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ q: deepLinkQuery, limit: "1" });
+    fetch(`/api/medicines/search?${params.toString()}`, { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const first = data?.medicines?.[0] as MedicineDTO | undefined;
+        if (first) {
+          setMedicine(first);
+        } else {
+          toast(tRef.current("search.noResults", { query: deepLinkQuery }));
+        }
+      })
+      .catch((e) => {
+        if (e?.name !== "AbortError") toast.error(tRef.current("search.searchFailed"));
+      });
+    return () => controller.abort();
+  }, [deepLinkQuery]);
 
   const fetchPharmacyPage = useCallback(
     async (cursor: string | null, append: boolean, signal: AbortSignal) => {
@@ -229,10 +257,10 @@ const HomePage = () => {
                 <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" aria-hidden="true" /> {t("home.welcomeBack")}
               </p>
               <h1 className="text-3xl sm:text-4xl font-black leading-tight">Welcome back, {session.user.name?.split(" ")[0] || "Patient"}</h1>
-              <p className="text-slate-300 text-base sm:text-lg">Manage your requests and discover nearby stock in seconds.</p>
+              <p className="text-slate-300 text-base sm:text-lg">{t("home.welcomeSubtitle")}</p>
               <div className="flex flex-wrap gap-3 pt-2">
                 <Link href={session.user.role === "PHARMACY" ? "/dashboard/pharmacy" : "/dashboard/patient"}>
-                  <Button className="rounded-full px-6">View My Requests</Button>
+                  <Button className="rounded-full px-6">{t("home.viewRequests")}</Button>
                 </Link>
                 <Link href="/how-it-works">
                   <Button variant="outline" className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur">{t("home.howItWorks")}</Button>
@@ -251,31 +279,36 @@ const HomePage = () => {
           )}
            
           <div className="mt-8 sm:mt-10 max-w-2xl mx-auto lg:mx-0">
-            <SearchBar onSelect={setMedicine} onClear={() => setMedicine(null)} selected={medicine} />
+            <SearchBar
+              onSelect={setMedicine}
+              onClear={() => setMedicine(null)}
+              selected={medicine}
+              initialQuery={deepLinkQuery}
+            />
             {/* Location status */}
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
               {locLoading ? (
                 <span className="inline-flex items-center gap-2 text-slate-300 bg-white/10 px-3 py-1.5 rounded-full border border-white/10">
                   <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
-                  Detecting location…
+                  {t("home.detectingLocation")}
                 </span>
               ) : location ? (
                 <span className="inline-flex items-center gap-2 text-emerald-200 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
                   <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
                   {location.lat.toFixed(3)}, {location.lng.toFixed(3)} · Within {radiusKm} km
-                  <button onClick={requestLocation} className="ml-1 underline underline-offset-2 hover:text-white transition-colors">Update</button>
+                  <button onClick={requestLocation} className="ml-1 underline underline-offset-2 hover:text-white transition-colors">{t("home.updateLocation")}</button>
                 </span>
               ) : error ? (
                 <span className="inline-flex flex-wrap items-center gap-2 text-amber-200 bg-amber-500/10 px-3 py-2 rounded-2xl border border-amber-500/20 max-w-full">
                   <ShieldAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span className="flex-1 min-w-[200px]">{error}</span>
                   <button onClick={requestLocation} className="inline-flex items-center gap-1 bg-white text-slate-900 px-3 py-1 rounded-full font-semibold text-xs hover:bg-slate-100 transition-colors shrink-0">
-                    <LocateFixed className="h-3 w-3" /> Retry
+                    <LocateFixed className="h-3 w-3" /> {t("home.retry")}
                   </button>
                 </span>
               ) : (
                 <button onClick={requestLocation} className="inline-flex items-center gap-1.5 text-slate-300 hover:text-white bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition-colors">
-                  <Navigation className="h-3.5 w-3.5" /> Enable location for nearest results
+                  <Navigation className="h-3.5 w-3.5" /> {t("home.enableLocation")}
                 </button>
               )}
             </div>
@@ -311,10 +344,10 @@ const HomePage = () => {
       <section className="max-w-6xl mx-auto px-4 w-full -mt-6 sm:-mt-8 relative z-20">
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {[
-            { label: "Verified Pharmacies", value: stats ? String(stats.verifiedPharmacies) : "—", icon: <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-blue-500" },
-            { label: "Medicine Types", value: stats ? `${Math.round(stats.medicineCount / 100) / 10}k+` : "—", icon: <Pill className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-indigo-500" },
+            { label: t("home.stats.verifiedPharmacies"), value: stats ? String(stats.verifiedPharmacies) : "—", icon: <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-blue-500" },
+            { label: t("home.stats.medicineTypes"), value: stats ? `${Math.round(stats.medicineCount / 100) / 10}k+` : "—", icon: <Pill className="h-5 w-5 sm:h-6 sm:w-6" />, color: "bg-indigo-500" },
           ].map((stat, i) => (
-            <Tilt3D key={i} maxTilt={10} disabled={lite} className="rounded-2xl">
+            <Tilt3D key={i} disabled={lite} className="rounded-2xl">
               <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl shadow-lg sm:shadow-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center h-full">
                 <div className={`${stat.color} text-white p-2.5 sm:p-3 rounded-xl mb-3 sm:mb-4 shadow-lg`}>{stat.icon}</div>
                 <div className="text-2xl sm:text-3xl font-black mb-1 text-slate-900 dark:text-white">
@@ -328,7 +361,12 @@ const HomePage = () => {
       </section>
 
       {/* 3. Search Results */}
-      <section className="max-w-7xl mx-auto px-4 w-full" aria-live="polite" aria-busy={searching}>
+      <section
+        id="pharmacies"
+        className="max-w-7xl mx-auto px-4 w-full scroll-mt-24"
+        aria-live="polite"
+        aria-busy={searching}
+      >
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
           <div className="min-w-0 animate-fadeIn motion-reduce:animate-none">
             <h2 className="text-2xl sm:text-3xl font-black flex items-center gap-3">
@@ -344,9 +382,9 @@ const HomePage = () => {
             {medicine && (
               <p className="text-sm text-slate-500 mt-2 flex flex-wrap items-center gap-2">
                 {searching ? (
-                  <span className="inline-flex items-center gap-2"><span className="w-3 h-3 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" /> Searching within {radiusKm} km…</span>
+                  <span className="inline-flex items-center gap-2"><span className="w-3 h-3 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" /> {t("home.searchingWithin", { km: radiusKm })}</span>
                 ) : (
-                  <span>{pharmacies.length} {pharmacies.length === 1 ? "pharmacy" : "pharmacies"} found · Sorted by distance</span>
+                  <span>{t("home.foundCount", { count: pharmacies.length })}</span>
                 )}
               </p>
             )}
@@ -355,16 +393,16 @@ const HomePage = () => {
             {mapAvailable && (
               <div className="lg:hidden flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl" role="tablist" aria-label="View mode">
                 <button role="tab" aria-selected={activeView === "list"} onClick={() => setActiveTab("list")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 ${activeView === "list" ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-white" : "text-slate-500"}`}>
-                  <List className="h-4 w-4" aria-hidden="true" /> List {pharmacies.length > 0 && `(${pharmacies.length})`}
+                  <List className="h-4 w-4" aria-hidden="true" /> {t("home.listView")} {pharmacies.length > 0 && `(${pharmacies.length})`}
                 </button>
                 <button role="tab" aria-selected={activeView === "map"} onClick={() => setActiveTab("map")} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 ${activeView === "map" ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-white" : "text-slate-500"}`}>
-                  <MapIcon className="h-4 w-4" aria-hidden="true" /> Map
+                  <MapIcon className="h-4 w-4" aria-hidden="true" /> {t("home.mapView")}
                 </button>
               </div>
             )}
             {medicine && !location && !locLoading && (
               <span className="hidden lg:inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-full border border-amber-200 dark:border-amber-900">
-                <MapPin className="h-3 w-3" /> Enable location for accurate distance
+                <MapPin className="h-3 w-3" /> {t("home.enableLocationForDistance")}
               </span>
             )}
           </div>
@@ -381,8 +419,8 @@ const HomePage = () => {
                     <ShieldAlert className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400" aria-hidden="true" />
                   </div>
                   <div>
-                    <h3 className="text-lg sm:text-xl font-bold mb-2">No local stock found</h3>
-                    <p className="text-slate-500 text-sm leading-relaxed">We couldn’t find pharmacies within {radiusKm} km with this item. Try a larger radius or send a request.</p>
+                    <h3 className="text-lg sm:text-xl font-bold mb-2">{t("home.empty.title")}</h3>
+                    <p className="text-slate-500 text-sm leading-relaxed">{t("home.empty.body", { km: radiusKm })}</p>
                   </div>
                   <div className="flex flex-wrap justify-center gap-2">
                     <div className="flex gap-1.5">
@@ -392,7 +430,7 @@ const HomePage = () => {
                     </div>
                   </div>
                   <Link href="/how-it-works">
-                    <Button variant="outline" className="rounded-full px-6">Learn How to Request Stock</Button>
+                    <Button variant="outline" className="rounded-full px-6">{t("home.empty.learnMore")}</Button>
                   </Link>
                 </Card>
               </div>
@@ -401,9 +439,9 @@ const HomePage = () => {
             {!searching && !medicine && pharmacies.length === 0 && (
               <Card className="p-8 text-center bg-gradient-to-br from-primary-50 to-indigo-50 dark:from-slate-900 dark:to-slate-800 border-primary-100 dark:border-slate-700">
                 <Pill className="h-10 w-10 text-primary-600 mx-auto mb-3" aria-hidden="true" />
-                <h3 className="font-bold mb-1">Start your search</h3>
-                <p className="text-sm text-slate-500 mb-1">Search for any generic or brand name above to see nearby availability.</p>
-                <p className="text-xs text-slate-400">Tip: Try “Paracetamol” or “Amoxicillin”</p>
+                <h3 className="font-bold mb-1">{t("home.start.title")}</h3>
+                <p className="text-sm text-slate-500 mb-1">{t("home.start.body")}</p>
+                <p className="text-xs text-slate-400">{t("home.start.tip")}</p>
               </Card>
             )}
 
@@ -443,7 +481,7 @@ const HomePage = () => {
                 onClick={loadMorePharmacies}
                 disabled={searching}
               >
-                Load more pharmacies
+                {t("home.loadMore")}
               </Button>
             )}
           </div>
@@ -462,16 +500,16 @@ const HomePage = () => {
                     <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/40 text-primary-600 rounded-xl flex items-center justify-center mx-auto mb-4">
                       <Search className="h-6 w-6" aria-hidden="true" />
                     </div>
-                    <h3 className="text-lg font-bold mb-1.5">Search to visualize</h3>
-                    <p className="text-slate-500 text-sm mb-4">Enter a medicine name to see available pharmacies on the interactive map.</p>
-                    <p className="text-xs font-semibold text-primary-600">↑ Use the search bar above</p>
+                    <h3 className="text-lg font-bold mb-1.5">{t("home.mapOverlay.title")}</h3>
+                    <p className="text-slate-500 text-sm mb-4">{t("home.mapOverlay.body")}</p>
+                    <p className="text-xs font-semibold text-primary-600">{t("home.mapOverlay.hint")}</p>
                   </div>
                 </div>
               )}
               {medicine && pharmacies.length > 0 && (
                 <div className="absolute bottom-3 left-3 right-3 sm:left-4 sm:right-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur px-3 py-2 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-medium flex items-center gap-2 z-10">
                   <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" aria-hidden="true" />
-                  {pharmacies.length} pharmacies · {medicine.genericName}
+                  {t("home.mapSummary", { count: pharmacies.length, name: medicine.genericName })}
                 </div>
               )}
             </div>
@@ -488,4 +526,10 @@ const HomePage = () => {
     );
 };
 
-export default HomePage;
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 dark:bg-slate-950" />}>
+      <HomePageContent />
+    </Suspense>
+  );
+}

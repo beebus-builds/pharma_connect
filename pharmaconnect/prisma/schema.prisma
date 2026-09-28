@@ -241,3 +241,17 @@ model Report {
   @@index([status])
   @@index([reporterId])
 }
+
+/// Footer signups. Double opt-in is off for now (no mail spend yet) but the
+/// `unsubscribedAt` column is already in place so enabling it later is a
+/// migration-free change plus a token.
+model NewsletterSubscriber {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  locale         String    @default("en") @db.VarChar(5)
+  source         String?   @db.VarChar(40)
+  unsubscribedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([createdAt])
+}

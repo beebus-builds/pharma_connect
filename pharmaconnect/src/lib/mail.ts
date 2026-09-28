@@ -30,9 +30,9 @@ function getMailConfig() {
   return { host, port, secure, user, pass, fromName, fromEmail };
 }
 
-export function isMailConfigured(): boolean {
-  const { user, pass } = getMailConfig();
-  return Boolean(user && pass);
+export function getMailFrom(): string {
+  const { fromName, fromEmail } = getMailConfig();
+  return `"${fromName}" <${fromEmail}>`;
 }
 
 let cachedTransporter: Transporter | null = null;
@@ -57,11 +57,6 @@ function getTransporter(): Transporter | null {
     cachedKey = key;
   }
   return cachedTransporter;
-}
-
-export function getMailFrom(): string {
-  const { fromName, fromEmail } = getMailConfig();
-  return `"${fromName}" <${fromEmail}>`;
 }
 
 /**
@@ -108,6 +103,10 @@ export function sendEmailInBackground(options: MailOptions): void {
   });
 }
 
+/**
+ * One-shot SMTP connectivity check for startup diagnostics and a
+ * `GET /api/health` probe. Cheap to call, but it opens a real connection.
+ */
 export async function verifyMailConnection(): Promise<boolean> {
   const transporter = getTransporter();
   if (!transporter) return false;

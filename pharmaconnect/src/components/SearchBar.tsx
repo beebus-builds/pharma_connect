@@ -11,6 +11,8 @@ interface SearchBarProps {
   onSelect: (medicine: MedicineDTO) => void;
   onClear?: () => void;
   selected?: MedicineDTO | null;
+  /** Pre-fills the input (e.g. from a `?q=` deep link). Does not auto-select. */
+  initialQuery?: string;
 }
 
 const RECENT_SEARCHES_KEY = "pharmaconnect_recent_searches";
@@ -30,9 +32,9 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
-export default function SearchBar({ onSelect, onClear, selected }: SearchBarProps) {
+export default function SearchBar({ onSelect, onClear, selected, initialQuery }: SearchBarProps) {
   const { t } = useLocale();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery ?? "");
   const [suggestions, setSuggestions] = useState<MedicineDTO[]>([]);
   const [recentSearches, setRecentSearches] = useState<MedicineDTO[]>([]);
   const [open, setOpen] = useState(false);
@@ -44,7 +46,19 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const queryRef = useRef("");
+  const queryRef = useRef(initialQuery ?? "");
+  // `t` changes identity on every locale switch. Holding it in a ref keeps it out
+  // of the search effect's deps so switching language does not re-run the query.
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
+
+  useEffect(() => {
+    if (initialQuery === undefined) return;
+    queryRef.current = initialQuery;
+    setQuery(initialQuery);
+  }, [initialQuery]);
 
   useEffect(() => {
     const saved = localStorage.getItem(RECENT_SEARCHES_KEY);
@@ -96,7 +110,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
           signal: controller.signal,
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || t("search.searchFailed"));
+        if (!res.ok) throw new Error(data.error || tRef.current("search.searchFailed"));
         if (!controller.signal.aborted) {
           setSuggestions(data.medicines ?? []);
           setNextCursor(data.pagination?.nextCursor ?? null);
@@ -107,7 +121,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
       } catch (err: any) {
         if (err.name !== "AbortError") {
           setSuggestions([]);
-          toast.error(err.message || t("search.searchFailed"));
+          toast.error(err.message || tRef.current("search.searchFailed"));
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -118,7 +132,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, selected, t]);
+  }, [query, selected]);
 
   const loadMore = useCallback(async () => {
     if (!query || !nextCursor || loadingMore) return;
@@ -128,7 +142,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
       const params = new URLSearchParams({ q: requestedQuery, limit: "15", cursor: nextCursor });
       const res = await fetch(`/api/medicines/search?${params.toString()}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("search.loadMoreFailed"));
+      if (!res.ok) throw new Error(data.error || tRef.current("search.loadMoreFailed"));
       if (queryRef.current !== requestedQuery) return;
       setSuggestions((previous) => {
         const existing = new Set(previous.map((medicine) => medicine.id));
@@ -137,11 +151,11 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
       setNextCursor(data.pagination?.nextCursor ?? null);
       setHasMore(Boolean(data.pagination?.hasMore));
     } catch (err: any) {
-      toast.error(err.message || t("search.loadMoreFailed"));
+      toast.error(err.message || tRef.current("search.loadMoreFailed"));
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, nextCursor, query, t]);
+  }, [loadingMore, nextCursor, query]);
 
   const handleSelect = useCallback(
     (medicine: MedicineDTO) => {

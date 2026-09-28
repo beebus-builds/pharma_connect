@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { legalBusinessName, legalRegisteredAddress, legalSupportEmail } from "@/lib/legal";
 
 export const metadata = {
   title: "Terms of Service - PharmaConnect",
@@ -6,9 +7,6 @@ export const metadata = {
 };
 
 const EFFECTIVE_DATE = "September 2, 2026";
-const SUPPORT_EMAIL = "support@pharmaconnect.com.np"; // TODO: replace with your real support inbox
-const BUSINESS_NAME = "PharmaConnect"; // TODO: replace with your registered business/entity name
-const REGISTERED_ADDRESS = "[Registered business address, Nepal]"; // TODO
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -19,7 +17,42 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function ContactBlock() {
+  const businessName = legalBusinessName();
+  const supportEmail = legalSupportEmail();
+  const address = legalRegisteredAddress();
+
+  return (
+    <>
+      <p>
+        {businessName}
+        {address.map((line) => (
+          <span key={line}>
+            <br />
+            {line}
+          </span>
+        ))}
+        {supportEmail && (
+          <>
+            <br />
+            Email:{" "}
+            <a className="text-primary-600 hover:underline" href={`mailto:${supportEmail}`}>
+              {supportEmail}
+            </a>
+          </>
+        )}
+      </p>
+      {!supportEmail && (
+        <p className="text-sm text-amber-700 dark:text-amber-400">
+          A support email address has not been published for this deployment yet.
+        </p>
+      )}
+    </>
+  );
+}
+
 export default function TermsPage() {
+  const BUSINESS_NAME = legalBusinessName();
   return (
     <div className="max-w-3xl mx-auto px-4 py-16">
       <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-2">Terms of Service</h1>
@@ -114,13 +147,7 @@ export default function TermsPage() {
       </Section>
 
       <Section title="11. Contact">
-        <p>
-          {BUSINESS_NAME}
-          <br />
-          {REGISTERED_ADDRESS}
-          <br />
-          Email: <a className="text-primary-600 hover:underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
-        </p>
+        <ContactBlock />
       </Section>
 
       <p className="text-sm text-slate-400">

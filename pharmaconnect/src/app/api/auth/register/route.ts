@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/lib/validations";
@@ -57,16 +57,16 @@ export async function POST(req: NextRequest) {
     });
 
     const tpl = verificationEmail(user.name, verificationToken);
-    const mailResult = await sendEmail({
-      to: email,
-      subject: tpl.subject,
-      text: tpl.text,
-      html: tpl.html,
-    });
 
-    if (!mailResult.success) {
-      console.warn("[register] verification email failed for", email, mailResult.error);
-    }
+    // Send after the response is flushed. SMTP can stall for tens of seconds on a
+    // bad network; the account already exists, so registration must not block on it.
+    // The login page always offers "Resend verification" as the recovery path.
+    after(async () => {
+      const mailResult = await sendEmail({ to: email, subject: tpl.subject, text: tpl.text, html: tpl.html });
+      if (!mailResult.success) {
+        console.warn("[register] verification email failed for", email, mailResult.error);
+      }
+    });
 
     return NextResponse.json(
       {
@@ -74,10 +74,8 @@ export async function POST(req: NextRequest) {
         name: user.name,
         email: user.email,
         role: user.role,
-        message: mailResult.success
-          ? "Account created! Please check your email to verify your account."
-          : "Account created, but we couldn't send the verification email. Use 'Resend verification' on the login page.",
-        emailSent: mailResult.success,
+        message: "Account created! Please check your email to verify your account. If nothing arrives, use 'Resend verification' on the login page.",
+        emailSent: true,
       },
       { status: 201 }
     );

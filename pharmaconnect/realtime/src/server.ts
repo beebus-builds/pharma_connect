@@ -199,10 +199,11 @@ io.on("connection", (socket) => {
       const room = `conv:${conv.id}`;
       io.to(room).emit("new_message", message);
 
-      // Notify inbox for both participants (for unread counts)
+      // Notify inbox for both participants (for unread counts). Note the id spaces
+      // differ: conv.patientId is a User id (joins `user:`), conv.pharmacyId is a
+      // Pharmacy id (joins `pharmacy:`). Do not cross-emit between them.
       io.to(`user:${conv.patientId}`).emit("inbox_update", { conversationId: conv.id, lastMessage: message });
       io.to(`pharmacy:${conv.pharmacyId}`).emit("inbox_update", { conversationId: conv.id, lastMessage: message });
-      io.to(`user:${conv.pharmacyId}`).emit("inbox_update", { conversationId: conv.id, lastMessage: message });
 
       if (ack) ack({ ok: true, message });
     } catch (e: any) {

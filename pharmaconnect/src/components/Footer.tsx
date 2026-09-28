@@ -9,14 +9,37 @@ import { appToast as toast } from "@/components/Providers";
 import { useLocale } from "@/components/LocaleProvider";
 
 export default function Footer() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!email) return;
-    toast.success(t("footer.subscribed"));
-    setEmail("");
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const value = String(formData.get("email") ?? "").trim();
+    if (!value || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: value,
+          website: String(formData.get("website") ?? ""),
+          locale,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || t("footer.subscribeFailed"));
+      toast.success(t("footer.subscribed"));
+      setEmail("");
+      form.reset();
+    } catch (err: any) {
+      toast.error(err.message || t("footer.subscribeFailed"));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -63,14 +86,27 @@ export default function Footer() {
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t("footer.emailPlaceholder")}
+                  aria-label={t("footer.emailPlaceholder")}
                   className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all"
                   required
                 />
               </div>
-              <Button type="submit" className="w-full py-2 text-sm">
+              {/* Honeypot: visually hidden, removed from the a11y tree and tab order. */}
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="absolute h-0 w-0 opacity-0 pointer-events-none"
+                defaultValue=""
+              />
+              <Button type="submit" className="w-full py-2 text-sm" loading={submitting} disabled={submitting}>
                 {t("footer.subscribe")}
               </Button>
             </form>

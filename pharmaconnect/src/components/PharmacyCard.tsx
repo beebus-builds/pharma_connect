@@ -13,15 +13,17 @@ import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
 import { facebookShareUrl } from "@/lib/seo";
 import { viberUrl, whatsappUrl } from "@/lib/contact";
+import { useLocale } from "@/components/LocaleProvider";
+import type { MessageKey } from "@/lib/i18n";
 import type { NearbyPharmacyDTO } from "@/types";
 
-const REPORT_REASONS = [
-  { value: "WRONG_STOCK", label: "Stock info is wrong" },
-  { value: "CLOSED", label: "Shop is closed / doesn't exist" },
-  { value: "WRONG_LOCATION", label: "Pin is in the wrong place" },
-  { value: "FAKE_LISTING", label: "Fake or duplicate listing" },
-  { value: "OTHER", label: "Something else" },
-];
+const REPORT_REASON_KEYS: Record<string, MessageKey> = {
+  WRONG_STOCK: "report.reasonWrongStock",
+  CLOSED: "report.reasonClosed",
+  WRONG_LOCATION: "report.reasonWrongLocation",
+  FAKE_LISTING: "report.reasonFake",
+  OTHER: "report.reasonOther",
+};
 
 interface PharmacyCardProps {
   pharmacy: NearbyPharmacyDTO;
@@ -50,18 +52,19 @@ export default function PharmacyCard({
   const [reportDetails, setReportDetails] = useState("");
   const [reporting, setReporting] = useState(false);
   const { data: session } = useSession();
+  const { t } = useLocale();
   const router = useRouter();
   const waLink = whatsappUrl(pharmacy.phone, pharmacy.name);
   const viberLink = viberUrl(pharmacy.phone);
 
   function openReport() {
     if (!session) {
-      toast.error("Please log in as a patient to report a listing");
+      toast.error(t("report.loginRequired"));
       router.push("/login");
       return;
     }
     if (session.user.role !== "PATIENT") {
-      toast.error("Only patient accounts can file reports");
+      toast.error(t("report.patientsOnly"));
       return;
     }
     setReportOpen(true);
@@ -77,12 +80,12 @@ export default function PharmacyCard({
         body: JSON.stringify({ pharmacyId: pharmacy.id, reason: reportReason, details: reportDetails || undefined }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to submit report");
-      toast.success(data.message || "Report submitted — thank you");
+      if (!res.ok) throw new Error(data.error || t("report.failed"));
+      toast.success(data.message || t("report.submitted"));
       setReportOpen(false);
       setReportDetails("");
     } catch (err: any) {
-      toast.error(err.message || "Something went wrong");
+      toast.error(err.message || t("report.genericError"));
     } finally {
       setReporting(false);
     }
@@ -121,8 +124,8 @@ export default function PharmacyCard({
           type="button"
           onClick={openReport}
           className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
-          aria-label={`Report ${pharmacy.name}`}
-          title="Report this listing"
+          aria-label={t("card.reportAria", { name: pharmacy.name })}
+          title={t("home.report")}
         >
           <Flag className="h-3.5 w-3.5" />
         </button>
@@ -136,8 +139,8 @@ export default function PharmacyCard({
               : `/pharmacies/${pharmacy.id}`
           }
           className="relative h-11 w-11 rounded-xl overflow-hidden bg-primary-50 dark:bg-primary-950/40 border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center hover:ring-2 hover:ring-primary-500/30 transition-shadow"
-          aria-label={`View ${pharmacy.name} storefront`}
-          title="View all products from this pharmacy"
+          aria-label={t("card.storefrontAria", { name: pharmacy.name })}
+          title={t("card.storefrontTitle")}
         >
           {pharmacy.profileImageUrl && !lite ? (
             <img
@@ -161,7 +164,7 @@ export default function PharmacyCard({
                 : `/pharmacies/${pharmacy.id}`
             }
             className="hover:underline underline-offset-2"
-            title="View all products from this pharmacy"
+            title={t("card.storefrontTitle")}
           >
             {pharmacy.name}
           </Link>
@@ -180,8 +183,10 @@ export default function PharmacyCard({
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 px-2.5 py-1.5 border border-slate-200 dark:border-slate-700">
-          <span className="font-bold text-slate-900 dark:text-slate-100">{pharmacy.quantity} units</span>
-          <span className="text-slate-500 hidden sm:inline">available</span>
+          <span className="font-bold text-slate-900 dark:text-slate-100">
+            {pharmacy.quantity} {t("card.units")}
+          </span>
+          <span className="text-slate-500 hidden sm:inline">{t("card.available")}</span>
           <span className="text-slate-300">·</span>
           <span className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-[120px]">{pharmacy.medicine.genericName}</span>
         </span>
@@ -196,10 +201,10 @@ export default function PharmacyCard({
         <a
           href={`tel:${pharmacy.phone}`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
-          aria-label={`Call ${pharmacy.name}`}
+          aria-label={t("card.callAria", { name: pharmacy.name })}
         >
           <Phone className="h-3.5 w-3.5" />
-          Call
+          {t("card.call")}
         </a>
         {canRequest && onRequest && (
           <Button
@@ -211,24 +216,28 @@ export default function PharmacyCard({
             loading={requesting}
             onClick={handleRequestClick}
             disabled={isSent}
-            aria-label={isSent ? "Request sent" : `Request ${pharmacy.medicine.genericName} from ${pharmacy.name}`}
+            aria-label={
+              isSent
+                ? t("card.requestSent")
+                : t("card.requestAria", { medicine: pharmacy.medicine.genericName, name: pharmacy.name })
+            }
           >
             {isSent ? (
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Sent
+                {t("card.sent")}
               </div>
             ) : (
               <>
                 <Send className="h-3.5 w-3.5" />
-                Request
+                {t("home.request")}
               </>
             )}
           </Button>
         )}
         <details className="relative ml-auto">
           <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 [&::-webkit-details-marker]:hidden">
-            More <ChevronDown className="h-3.5 w-3.5" />
+            {t("card.more")} <ChevronDown className="h-3.5 w-3.5" />
           </summary>
           <div className="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1.5 shadow-xl">
             <a
@@ -237,7 +246,7 @@ export default function PharmacyCard({
               rel="noopener noreferrer"
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
             >
-              <MapPin className="h-3.5 w-3.5" /> View Map
+              <MapPin className="h-3.5 w-3.5" /> {t("card.viewMap")}
             </a>
             <a
               href={`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.latitude},${pharmacy.longitude}`}
@@ -245,7 +254,7 @@ export default function PharmacyCard({
               rel="noopener noreferrer"
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
             >
-              <MapPin className="h-3.5 w-3.5" /> Directions
+              <MapPin className="h-3.5 w-3.5" /> {t("card.directions")}
             </a>
             {waLink && (
               <a
@@ -277,7 +286,7 @@ export default function PharmacyCard({
               rel="noopener noreferrer"
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
             >
-              <Facebook className="h-3.5 w-3.5 text-[#1877F2]" /> Share
+              <Facebook className="h-3.5 w-3.5 text-[#1877F2]" /> {t("card.share")}
             </a>
           </div>
         </details>
@@ -288,44 +297,46 @@ export default function PharmacyCard({
           onClick={() => setReportOpen(false)}
           role="dialog"
           aria-modal="true"
-          aria-label={`Report ${pharmacy.name}`}
+          aria-label={t("card.reportAria", { name: pharmacy.name })}
         >
           <form
             onSubmit={submitReport}
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl"
           >
-            <h3 className="font-bold text-base mb-1">Report this listing</h3>
-            <p className="text-xs text-slate-500 mb-4">{pharmacy.name} · reports are reviewed by our team</p>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              What&apos;s wrong?
+            <h3 className="font-bold text-base mb-1">{t("report.title")}</h3>
+            <p className="text-xs text-slate-500 mb-4">{t("report.subtitle", { name: pharmacy.name })}</p>
+            <label htmlFor={`report-reason-${pharmacy.id}`} className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+              {t("report.reasonLabel")}
             </label>
             <select
+              id={`report-reason-${pharmacy.id}`}
               value={reportReason}
               onChange={(e) => setReportReason(e.target.value)}
               className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
             >
-              {REPORT_REASONS.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
+              {Object.entries(REPORT_REASON_KEYS).map(([value, key]) => (
+                <option key={value} value={value}>{t(key)}</option>
               ))}
             </select>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              Details (optional)
+            <label htmlFor={`report-details-${pharmacy.id}`} className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+              {t("report.detailsLabel")}
             </label>
             <textarea
+              id={`report-details-${pharmacy.id}`}
               value={reportDetails}
               onChange={(e) => setReportDetails(e.target.value)}
               rows={3}
               maxLength={1000}
-              placeholder="e.g. Visited yesterday, shop was closed at 2pm"
+              placeholder={t("report.detailsPlaceholder")}
               className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
             />
             <div className="flex gap-2">
               <Button type="button" variant="secondary" className="flex-1 text-xs" onClick={() => setReportOpen(false)}>
-                Cancel
+                {t("report.cancel")}
               </Button>
               <Button type="submit" loading={reporting} className="flex-1 text-xs">
-                Submit report
+                {t("report.submit")}
               </Button>
             </div>
           </form>

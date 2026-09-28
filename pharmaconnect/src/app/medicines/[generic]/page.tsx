@@ -30,12 +30,30 @@ interface VariantRow {
   lowestMrp: number | null;
 }
 
+/**
+ * Slug -> canonical generic name. Deslugify first and query by exact name so this
+ * stays a single indexed lookup instead of scanning the whole catalog per request.
+ * Falls back to a scan only when the deslugified form misses (odd spellings).
+ */
 async function resolveGeneric(slug: string): Promise<string | null> {
   const target = normalizeSlug(slug);
+  if (!target) return null;
+  const candidate = deslugifyGeneric(target);
+
   try {
-    const names = await prisma.medicine.findMany({
+    const direct = await prisma.medicine.findFirst({
+      where: { genericName: { equals: candidate, mode: "insensitive" } },
       select: { genericName: true },
-      take: 2000,
+    });
+    if (direct) return direct.genericName.trim();
+
+    // Slug shape doesn't round-trip (e.g. "500mg" packed into the slug). Fall back
+    // to matching on the deslugified prefix across the distinct generic names.
+    const names = await prisma.medicine.findMany({
+      where: { genericName: { contains: candidate, mode: "insensitive" } },
+      select: { genericName: true },
+      distinct: ["genericName"],
+      take: 25,
     });
     const seen = new Map<string, string>();
     for (const n of names) {
@@ -84,22 +102,52 @@ export async function generateStaticParams(): Promise<{ generic: string }[]> {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { generic } = await params;
   const resolved = await resolveGeneric(generic);
-  const display = resolved ?? deslugifyGeneric(generic);
-  const url = medicineCanonicalUrl(display);
-  const description = medicineSeoDescription(display, 1, 1);
+  if (!resolved) {
+    return { title: "Medicine not found | PharmaConnect", robots: { index: false, follow: true } };
+  }
+
+  // Real counts, not 1/1 placeholders — the page body computes the same numbers.
+  let description = medicineSeoDescription(resolved, 1, 1);
+  try {
+    const [brands, strengths, inStock] = await Promise.all([
+      prisma.medicine.findMany({
+        where: { genericName: { equals: resolved, mode: "insensitive" } },
+        select: { brandName: true },
+        distinct: ["brandName"],
+      }),
+      prisma.medicine.findMany({
+        where: { genericName: { equals: resolved, mode: "insensitive" } },
+        select: { strength: true },
+        distinct: ["strength"],
+      }),
+      prisma.pharmacyStock.findMany({
+        where: {
+          medicine: { genericName: { equals: resolved, mode: "insensitive" } },
+          quantity: { gt: 0 },
+        },
+        select: { pharmacyId: true },
+        distinct: ["pharmacyId"],
+      }),
+    ]);
+    description = medicineSeoDescription(resolved, brands.length, strengths.length, inStock.length);
+  } catch {
+    // Keep the 1/1 fallback description.
+  }
+
+  const url = medicineCanonicalUrl(resolved);
   return {
-    title: medicineSeoTitle(display),
+    title: medicineSeoTitle(resolved),
     description,
     alternates: { canonical: url },
     openGraph: {
-      title: `${display} price in Nepal | PharmaConnect`,
+      title: `${resolved} price in Nepal | PharmaConnect`,
       description,
       url,
       type: "website",
     },
     twitter: {
       card: "summary",
-      title: `${display} price in Nepal | PharmaConnect`,
+      title: `${resolved} price in Nepal | PharmaConnect`,
       description,
     },
   };
@@ -124,7 +172,9 @@ export default async function MedicineGenericPage({ params }: PageProps) {
   const inStockTotal = variants.reduce((n, v) => n + v.inStockPharmacies, 0);
   const description = medicineSeoDescription(resolved, brands.length, strengths.length, inStockTotal);
   const canonical = medicineCanonicalUrl(resolved);
-  const searchHref = `/?q=${encodeURIComponent(resolved)}`;
+  // Homepage reads `?q=` to preselect this medicine and `#pharmacies` to scroll
+  // the results list into view.
+  const searchHref = `/?q=${encodeURIComponent(resolved)}#pharmacies`;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -135,17 +185,17 @@ export default async function MedicineGenericPage({ params }: PageProps) {
     manufacturer: manufacturers.slice(0, 5).map((name) => ({ "@type": "Organization", name })),
   };
 
+  // Related = other generics people actually stock, not arbitrary catalog rows.
   const related = await (async () => {
     try {
-      const rows = await prisma.medicine.findMany({
-        select: { genericName: true },
-        take: 60,
+      const rows = await prisma.medicine.groupBy({
+        by: ["genericName"],
+        where: { genericName: { not: resolved } },
+        _count: { _all: true },
+        orderBy: { _count: { genericName: "desc" } },
+        take: 6,
       });
-      const lowered = resolved.trim().toLowerCase();
-      const uniq = [...new Set(rows.map((r) => r.genericName.trim()))].filter(
-        (n) => n && n.toLowerCase() !== lowered
-      );
-      return uniq.slice(0, 6);
+      return rows.map((r) => r.genericName.trim()).filter(Boolean);
     } catch {
       return [];
     }
@@ -173,10 +223,10 @@ export default async function MedicineGenericPage({ params }: PageProps) {
           <Search className="h-3.5 w-3.5" /> Check nearby stock
         </Link>
         <Link
-          href="/#pharmacies"
+          href="/medicines"
           className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
         >
-          <MapPin className="h-3.5 w-3.5" /> Kathmandu valley pharmacies
+          <MapPin className="h-3.5 w-3.5" /> Browse all medicines
         </Link>
         <ShareButtons url={canonical} title={`${resolved} price in Nepal`} />
       </div>

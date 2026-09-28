@@ -5,25 +5,23 @@ import { cn } from "@/lib/utils";
 
 interface Tilt3DProps {
   children: ReactNode;
-  maxTilt?: number;
   className?: string;
-  popLayer?: ReactNode;
   disabled?: boolean;
   onClick?: () => void;
 }
 
-export default function Tilt3D({ children, className, popLayer, disabled, onClick }: Tilt3DProps) {
+/**
+ * Lightweight hover-lift wrapper. Named for the effect it replaced — a real
+ * 3D tilt cost more GPU time than it was worth on the devices this app targets,
+ * so this is now just a transform on hover.
+ */
+export default function Tilt3D({ children, className, disabled, onClick }: Tilt3DProps) {
   return (
     <div
       className={cn(!disabled && "transition-transform duration-200 hover:-translate-y-0.5", className)}
       onClick={onClick}
     >
       {children}
-      {popLayer && (
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          {popLayer}
-        </div>
-      )}
     </div>
   );
 }

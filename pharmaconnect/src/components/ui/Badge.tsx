@@ -1,5 +1,8 @@
+"use client";
+
 import { BadgeCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/LocaleProvider";
 import type { StockStatus } from "@/types";
 
 const stockStyles: Record<StockStatus, string> = {
@@ -8,22 +11,25 @@ const stockStyles: Record<StockStatus, string> = {
   "out-of-stock": "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
 };
 
-const stockLabels: Record<StockStatus, string> = {
-  "in-stock": "In Stock",
-  "low-stock": "Low Stock",
-  "out-of-stock": "Out of Stock",
-};
+const stockLabelKeys = {
+  "in-stock": "badge.inStock",
+  "low-stock": "badge.lowStock",
+  "out-of-stock": "badge.outOfStock",
+} as const;
 
 export function StockBadge({ status }: { status: StockStatus }) {
+  const { t } = useLocale();
   return (
     <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full", stockStyles[status])}>
-      {stockLabels[status]}
+      {t(stockLabelKeys[status])}
     </span>
   );
 }
 
 export function DistanceBadge({ km }: { km: number }) {
-  const label = km < 1 ? `${Math.round(km * 1000)} m away` : `${km.toFixed(1)} km away`;
+  const { t } = useLocale();
+  const label =
+    km < 1 ? t("badge.metersAway", { m: Math.round(km * 1000) }) : t("badge.kmAway", { km: km.toFixed(1) });
   return (
     <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
       {label}
@@ -41,10 +47,11 @@ export function StatusBadge({ status, label }: { status: "PENDING" | "AVAILABLE"
 }
 
 export function VerifiedBadge() {
+  const { t } = useLocale();
   return (
     <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
       <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
-      Verified
+      {t("badge.verified")}
     </span>
   );
 }
