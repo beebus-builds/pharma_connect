@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { appToast as toast } from "@/components/Providers";
 import { Search, X, History, Pill, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/LocaleProvider";
 import type { MedicineDTO } from "@/types";
 
 interface SearchBarProps {
@@ -30,6 +31,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
 }
 
 export default function SearchBar({ onSelect, onClear, selected }: SearchBarProps) {
+  const { t } = useLocale();
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<MedicineDTO[]>([]);
   const [recentSearches, setRecentSearches] = useState<MedicineDTO[]>([]);
@@ -94,7 +96,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
           signal: controller.signal,
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Search failed");
+        if (!res.ok) throw new Error(data.error || t("search.searchFailed"));
         if (!controller.signal.aborted) {
           setSuggestions(data.medicines ?? []);
           setNextCursor(data.pagination?.nextCursor ?? null);
@@ -105,7 +107,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
       } catch (err: any) {
         if (err.name !== "AbortError") {
           setSuggestions([]);
-          toast.error(err.message || "Search failed");
+          toast.error(err.message || t("search.searchFailed"));
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -116,7 +118,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, selected]);
+  }, [query, selected, t]);
 
   const loadMore = useCallback(async () => {
     if (!query || !nextCursor || loadingMore) return;
@@ -126,7 +128,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
       const params = new URLSearchParams({ q: requestedQuery, limit: "15", cursor: nextCursor });
       const res = await fetch(`/api/medicines/search?${params.toString()}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Search failed");
+      if (!res.ok) throw new Error(data.error || t("search.loadMoreFailed"));
       if (queryRef.current !== requestedQuery) return;
       setSuggestions((previous) => {
         const existing = new Set(previous.map((medicine) => medicine.id));
@@ -135,11 +137,11 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
       setNextCursor(data.pagination?.nextCursor ?? null);
       setHasMore(Boolean(data.pagination?.hasMore));
     } catch (err: any) {
-      toast.error(err.message || "Could not load more medicines");
+      toast.error(err.message || t("search.loadMoreFailed"));
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, nextCursor, query]);
+  }, [loadingMore, nextCursor, query, t]);
 
   const handleSelect = useCallback(
     (medicine: MedicineDTO) => {
@@ -215,14 +217,14 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search medicine by generic or brand name..."
+          placeholder={t("search.placeholder")}
           className="w-full pl-12 pr-12 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm shadow-sm focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all duration-200 placeholder:text-slate-400"
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
           aria-activedescendant={activeId}
           aria-autocomplete="list"
-          aria-label="Search medicine"
+          aria-label={t("search.label")}
           autoComplete="off"
           spellCheck={false}
         />
@@ -238,7 +240,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
               inputRef.current?.focus();
             }}
             className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
-            aria-label="Clear search"
+            aria-label={t("search.clear")}
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -249,12 +251,12 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
           <div
             className="absolute z-50 mt-2 w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl overflow-hidden max-h-[460px] flex flex-col animate-slideUp motion-reduce:animate-none"
             role="region"
-            aria-label="Search suggestions"
+            aria-label={t("search.suggestions")}
           >
             {loading && (
               <div className="px-4 py-4 text-sm text-slate-500 flex items-center gap-3">
                 <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-                <span aria-live="polite">Searching medicines…</span>
+                <span aria-live="polite">{t("search.searching")}</span>
               </div>
             )}
 
@@ -262,7 +264,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
               <div className="px-4 py-8 text-center">
                 <Pill className="h-8 w-8 text-slate-300 mx-auto mb-2" aria-hidden="true" />
                 <p className="text-sm text-slate-500">
-                  {query ? `No medicines found for “${query}”. Try another keyword.` : "Start typing to search medicines."}
+                  {query ? t("search.noResults", { query }) : t("search.empty")}
                 </p>
               </div>
             )}
@@ -270,16 +272,16 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
             {!loading && isShowingRecent && (
               <div className="py-2" ref={listRef}>
                 <div className="px-4 py-2 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recent Searches</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("search.recent")}</span>
                   <button
                     onClick={clearRecent}
                     className="text-[10px] font-semibold text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/20 rounded px-1"
-                    aria-label="Clear recent searches"
+                    aria-label={t("search.clearRecentAria")}
                   >
-                    <Trash2 className="h-3 w-3" /> Clear
+                    <Trash2 className="h-3 w-3" /> {t("search.clear")}
                   </button>
                 </div>
-                <div className="max-h-40 overflow-y-auto" id={listId} role="listbox" aria-label="Recent searches">
+                <div className="max-h-40 overflow-y-auto" id={listId} role="listbox" aria-label={t("search.recentList")}>
                   {recentSearches.map((m, idx) => (
                     <button
                       key={`recent-${m.id}`}
@@ -310,9 +312,9 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
             {!loading && isShowingSuggestions && (
               <div className="py-2" ref={listRef}>
                 <div className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {suggestions.length} {suggestions.length === 1 ? "Match" : "Matches"} for “{query}”
+                  {t("search.matches", { count: suggestions.length, query })}
                 </div>
-                <div className="max-h-72 overflow-y-auto" id={listId} role="listbox" aria-label="Medicine suggestions">
+                <div className="max-h-72 overflow-y-auto" id={listId} role="listbox" aria-label={t("search.suggestions")}>
                   {suggestions.map((m, idx) => (
                     <button
                       key={m.id}
@@ -359,7 +361,7 @@ export default function SearchBar({ onSelect, onClear, selected }: SearchBarProp
                     disabled={loadingMore}
                     className="w-full border-t border-slate-100 dark:border-slate-700 px-4 py-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-800 disabled:opacity-60"
                   >
-                    {loadingMore ? "Loading more…" : "Show more medicines"}
+                    {loadingMore ? t("search.loadingMore") : t("search.loadMore")}
                   </button>
                 )}
               </div>

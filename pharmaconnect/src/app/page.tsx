@@ -26,6 +26,7 @@ import Tilt3D from "@/components/ui/Tilt3D";
 import Hero3D from "@/components/ui/Hero3D";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useLiteMode } from "@/hooks/useLiteMode";
+import { useLocale } from "@/components/LocaleProvider";
 import type { MedicineDTO, NearbyPharmacyDTO } from "@/types";
 import Link from "next/link";
 
@@ -56,6 +57,7 @@ const HomePage = () => {
   const [activePharmacyId, setActivePharmacyId] = useState<string | null>(null);
   const pharmacyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { lite, ready: liteModeReady } = useLiteMode();
+  const { t } = useLocale();
   const [stats, setStats] = useState<{ verifiedPharmacies: number; medicineCount: number } | null>(null);
 
   // Real trust-bar counts — replaces hardcoded marketing numbers.
@@ -224,7 +226,7 @@ const HomePage = () => {
           {session ? (
             <div className="space-y-5 max-w-3xl animate-slideUp motion-reduce:animate-none">
               <p className="inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase bg-white/10 px-3 py-1.5 rounded-full border border-white/10">
-                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" aria-hidden="true" /> Welcome back
+                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" aria-hidden="true" /> {t("home.welcomeBack")}
               </p>
               <h1 className="text-3xl sm:text-4xl font-black leading-tight">Welcome back, {session.user.name?.split(" ")[0] || "Patient"}</h1>
               <p className="text-slate-300 text-base sm:text-lg">Manage your requests and discover nearby stock in seconds.</p>
@@ -233,17 +235,17 @@ const HomePage = () => {
                   <Button className="rounded-full px-6">View My Requests</Button>
                 </Link>
                 <Link href="/how-it-works">
-                  <Button variant="outline" className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur">How it works</Button>
+                  <Button variant="outline" className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur">{t("home.howItWorks")}</Button>
                 </Link>
               </div>
             </div>
           ) : (
             <div className="text-center max-w-3xl mx-auto">
               <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-4 animate-slideUp motion-reduce:animate-none">
-                Find Your <span className="text-primary-300">Medicine</span> Nearby
+                {t("home.searchNearby")}
               </h1>
               <p className="text-slate-300 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed animate-fadeIn motion-reduce:animate-none">
-                Real-time stock from verified pharmacies across Nepal. No more calls — just search, find, and go.
+                {t("home.subtitle")}
               </p>
             </div>
           )}
@@ -281,7 +283,7 @@ const HomePage = () => {
             {medicine && (
               <div className="mt-3 flex items-center gap-2">
                 <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
-                  <SlidersHorizontal className="h-3 w-3" /> Radius:
+                  <SlidersHorizontal className="h-3 w-3" /> {t("home.radius")}:
                 </span>
                 <div className="flex gap-1.5" role="group" aria-label="Search radius">
                   {[2, 5, 10, 20].map((r) => (
@@ -333,9 +335,9 @@ const HomePage = () => {
               <span className="p-2 bg-primary-600 text-white rounded-xl shadow-md shrink-0"><Pill className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" /></span>
               <span className="truncate">
                 {medicine ? (
-                  <span>Pharmacies with <span className="text-primary-600">{medicine.genericName}</span></span>
+                  <span>{t("home.pharmaciesNearby")} <span className="text-primary-600">{medicine.genericName}</span></span>
                 ) : (
-                  <span className="text-slate-400">Ready to find your medicine?</span>
+                  <span className="text-slate-400">{t("home.readyPrompt")}</span>
                 )}
               </span>
             </h2>

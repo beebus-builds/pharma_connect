@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { Session } from "next-auth";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LiteModeProvider } from "@/hooks/useLiteMode";
+import { LocaleProvider } from "@/components/LocaleProvider";
 
 type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 type SignOutOptions = { callbackUrl?: string };
@@ -143,10 +144,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AppSessionProvider>
       <ThemeProvider>
-        <LiteModeProvider>
-          {children}
-          <ToastViewport />
-        </LiteModeProvider>
+        <LocaleProvider>
+          <LiteModeProvider>
+            {children}
+            <ToastViewport />
+          </LiteModeProvider>
+        </LocaleProvider>
       </ThemeProvider>
     </AppSessionProvider>
   );

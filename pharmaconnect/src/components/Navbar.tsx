@@ -6,11 +6,14 @@ import { useState, useEffect, useRef } from "react";
 import { Moon, Sun, Stethoscope, LogOut, LayoutDashboard, User, HelpCircle, Menu, X, Settings, MessageCircle, Leaf } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useLiteMode } from "@/hooks/useLiteMode";
+import { useLocale } from "@/components/LocaleProvider";
+import LocaleToggle from "@/components/LocaleToggle";
 
 export default function Navbar() {
   const { data: session, status, signOut } = useSession();
   const { theme, toggleTheme } = useTheme();
   const { lite, ready: liteReady, setMode: setLiteMode } = useLiteMode();
+  const { t } = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -56,23 +59,23 @@ export default function Navbar() {
     <>
       <Link href="/how-it-works" className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30" onClick={() => setMobileOpen(false)}>
         <HelpCircle className="h-4 w-4 shrink-0" />
-        How it Works
+        {t("nav.howItWorks")}
       </Link>
       <Link href={dashboardHref} className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30" onClick={() => setMobileOpen(false)}>
         <LayoutDashboard className="h-4 w-4 shrink-0" />
-        Dashboard
+        {t("nav.dashboard")}
       </Link>
       <Link href="/chat" className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30" onClick={() => setMobileOpen(false)}>
         <MessageCircle className="h-4 w-4 shrink-0" />
-        Messages
+        {t("nav.messages")}
       </Link>
       <Link href="/profile" className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30" onClick={() => setMobileOpen(false)}>
         <User className="h-4 w-4 shrink-0" />
-        Profile
+        {t("nav.profile")}
       </Link>
       <Link href="/settings" className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30" onClick={() => setMobileOpen(false)}>
         <Settings className="h-4 w-4 shrink-0" />
-        Settings
+        {t("nav.settings")}
       </Link>
       <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
       <div className="flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-0 border-slate-100 dark:border-slate-800">
@@ -86,7 +89,7 @@ export default function Navbar() {
           aria-label="Sign out"
         >
           <LogOut className="h-4 w-4" />
-          Sign out
+          {t("nav.signOut")}
         </button>
       </div>
     </>
@@ -97,14 +100,14 @@ export default function Navbar() {
         className="text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
         onClick={() => setMobileOpen(false)}
       >
-        Log in
+        {t("nav.login")}
       </Link>
       <Link
         href="/register"
         className="text-sm font-semibold px-5 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 shadow-md shadow-primary-600/20 hover:shadow-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
         onClick={() => setMobileOpen(false)}
       >
-        Sign up
+        {t("nav.signup")}
       </Link>
     </>
   );
@@ -112,7 +115,7 @@ export default function Navbar() {
   return (
     <>
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 z-[60] bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-        Skip to content
+        {t("nav.skipToContent")}
       </a>
       <header className="sticky top-0 z-50 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -124,12 +127,14 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-1">
+            <LocaleToggle />
+
             <button
               onClick={() => setLiteMode(!lite)}
               disabled={!liteReady}
-              aria-label={`${lite ? "Disable" : "Enable"} lite mode`}
+              aria-label={lite ? t("nav.liteModeOff") : t("nav.liteModeOn")}
               aria-pressed={lite}
-              title={`${lite ? "Disable" : "Enable"} lite mode`}
+              title={lite ? t("nav.liteModeOff") : t("nav.liteModeOn")}
               className={`p-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 disabled:cursor-wait disabled:opacity-50 ${
                 lite
                   ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
@@ -141,7 +146,7 @@ export default function Navbar() {
 
             <button
               onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+              aria-label={theme === "dark" ? t("nav.themeLight") : t("nav.themeDark")}
               className="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -154,7 +159,7 @@ export default function Navbar() {
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="sm:hidden p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
-              aria-label="Toggle menu"
+              aria-label={t("nav.toggleMenu")}
               aria-expanded={mobileOpen}
               aria-controls="mobile-menu"
             >

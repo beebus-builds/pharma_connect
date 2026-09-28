@@ -4,6 +4,7 @@ import Providers from "@/components/Providers";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PageWrapper from "@/components/PageWrapper";
+import OfflineManager from "@/components/OfflineManager";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getSiteUrl } from "@/lib/seo";
 
@@ -11,6 +12,21 @@ const siteUrl = getSiteUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  manifest: "/manifest.webmanifest",
+  applicationName: "PharmaConnect",
+  appleWebApp: {
+    capable: true,
+    title: "PharmaConnect",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  formatDetection: { telephone: false },
   title: {
     default: "PharmaConnect - Find Medicines Near You",
     template: "%s | PharmaConnect",
@@ -46,6 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </PageWrapper>
           </main>
           <Footer />
+          <OfflineManager />
         </Providers>
       </body>
     </html>

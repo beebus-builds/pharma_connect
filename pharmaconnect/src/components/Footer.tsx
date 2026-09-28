@@ -6,14 +6,16 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useState } from "react";
 import { appToast as toast } from "@/components/Providers";
+import { useLocale } from "@/components/LocaleProvider";
 
 export default function Footer() {
+  const { t } = useLocale();
   const [email, setEmail] = useState("");
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    toast.success("Thanks for subscribing!");
+    toast.success(t("footer.subscribed"));
     setEmail("");
   };
 
@@ -29,7 +31,7 @@ export default function Footer() {
               PharmaConnect
             </Link>
             <p className="text-slate-500 max-w-sm leading-relaxed mb-8 text-lg">
-              Empowering patients and pharmacies across Nepal with real-time availability data, reducing healthcare friction, and saving precious time.
+              {t("footer.tagline")}
             </p>
             <div className="flex gap-4">
               {[
@@ -45,17 +47,17 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-black text-slate-900 dark:text-white mb-6 uppercase tracking-widest text-sm">Quick Links</h4>
+            <h4 className="font-black text-slate-900 dark:text-white mb-6 uppercase tracking-widest text-sm">{t("footer.quickLinks")}</h4>
             <ul className="space-y-4 text-slate-500 font-medium">
-              <li><Link href="/" className="hover:text-primary-600 transition-colors flex items-center gap-2">Search Medicines</Link></li>
-              <li><Link href="/how-it-works" className="hover:text-primary-600 transition-colors flex items-center gap-2">How it Works</Link></li>
-              <li><Link href="/login" className="hover:text-primary-600 transition-colors flex items-center gap-2">User Login</Link></li>
-              <li><Link href="/register" className="hover:text-primary-600 transition-colors flex items-center gap-2">Join as Pharmacy</Link></li>
+              <li><Link href="/" className="hover:text-primary-600 transition-colors flex items-center gap-2">{t("footer.searchMedicines")}</Link></li>
+              <li><Link href="/how-it-works" className="hover:text-primary-600 transition-colors flex items-center gap-2">{t("nav.howItWorks")}</Link></li>
+              <li><Link href="/login" className="hover:text-primary-600 transition-colors flex items-center gap-2">{t("footer.userLogin")}</Link></li>
+              <li><Link href="/register" className="hover:text-primary-600 transition-colors flex items-center gap-2">{t("footer.joinPharmacy")}</Link></li>
             </ul>
           </div>
 
           <div className="col-span-1">
-            <h4 className="font-black text-slate-900 dark:text-white mb-6 uppercase tracking-widest text-sm">Stay Updated</h4>
+            <h4 className="font-black text-slate-900 dark:text-white mb-6 uppercase tracking-widest text-sm">{t("footer.stayUpdated")}</h4>
             <form onSubmit={handleSubscribe} className="space-y-3">
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -63,13 +65,13 @@ export default function Footer() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email address"
+                  placeholder={t("footer.emailPlaceholder")}
                   className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all"
                   required
                 />
               </div>
               <Button type="submit" className="w-full py-2 text-sm">
-                Subscribe
+                {t("footer.subscribe")}
               </Button>
             </form>
           </div>
@@ -78,9 +80,9 @@ export default function Footer() {
         <div className="border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
           <p>© {new Date().getFullYear()} PharmaConnect Nepal. Engineered for a healthier nation.</p>
           <div className="flex gap-6">
-            <Link href="/privacy" className="hover:text-slate-600 transition-colors">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-slate-600 transition-colors">Terms of Service</Link>
-            <Link href="mailto:support@pharmaconnect.com.np" className="hover:text-slate-600 transition-colors">Contact</Link>
+            <Link href="/privacy" className="hover:text-slate-600 transition-colors">{t("footer.privacy")}</Link>
+            <Link href="/terms" className="hover:text-slate-600 transition-colors">{t("footer.terms")}</Link>
+            <Link href="mailto:support@pharmaconnect.com.np" className="hover:text-slate-600 transition-colors">{t("footer.contact")}</Link>
           </div>
         </div>
       </div>

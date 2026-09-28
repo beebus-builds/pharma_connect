@@ -6,8 +6,10 @@ import { appToast as toast } from "@/components/Providers";
 import { KeyRound } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useLocale } from "@/components/LocaleProvider";
 
 export default function ForgotPasswordPage() {
+  const { t } = useLocale();
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -24,7 +26,7 @@ export default function ForgotPasswordPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
       setSent(true);
-      toast.success("Reset link sent — check your inbox.");
+      toast.success(t("auth.linkSent"));
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -39,24 +41,23 @@ export default function ForgotPasswordPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 text-white rounded-2xl shadow-lg mb-4">
             <KeyRound className="h-8 w-8" />
           </div>
-          <h1 className="text-3xl font-bold">Forgot password?</h1>
-          <p className="text-slate-500 mt-1">We&apos;ll email you a reset link (valid 60 minutes).</p>
+          <h1 className="text-3xl font-bold">{t("auth.forgotTitle")}</h1>
+          <p className="text-slate-500 mt-1">{t("auth.forgotSubtitle")}</p>
         </div>
         <div className="bg-white dark:bg-slate-800/90 rounded-2xl shadow-xl border border-slate-200/50 p-8">
           {sent ? (
             <div className="text-center space-y-4">
               <p className="text-sm text-slate-600 dark:text-slate-300">
-                If an account exists for <strong>{email}</strong>, a reset link is on its way.
-                Check spam too — then click the link within 60 minutes.
+                {t("auth.linkSent")} <strong>{email}</strong>
               </p>
               <Link href="/login" className="text-primary-600 font-semibold text-sm">
-                Back to login
+                {t("auth.backToLogin")}
               </Link>
             </div>
           ) : (
             <form onSubmit={onSubmit} className="space-y-5">
               <Input
-                label="Email"
+                label={t("auth.email")}
                 type="email"
                 required
                 placeholder="you@example.com"
@@ -64,12 +65,12 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setEmail(e.target.value)}
               />
               <Button type="submit" loading={sending} className="w-full">
-                Send reset link
+                {t("auth.sendResetLink")}
               </Button>
               <div className="text-center text-sm text-slate-500">
-                Remembered it?{" "}
+                {t("nav.login")}{" "}
                 <Link href="/login" className="text-primary-600 font-semibold">
-                  Log in
+                  {t("auth.signIn")}
                 </Link>
               </div>
             </form>

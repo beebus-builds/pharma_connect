@@ -7,10 +7,12 @@ import { appToast as toast } from "@/components/Providers";
 import { LockKeyhole } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useLocale } from "@/components/LocaleProvider";
 
 function ResetInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLocale();
   const token = searchParams.get("token") ?? "";
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -35,7 +37,7 @@ function ResetInner() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Reset failed");
-      toast.success("Password changed. Please log in.");
+      toast.success(t("auth.passwordUpdated"));
       router.push("/login?reset=done");
     } catch (err: any) {
       toast.error(err.message);
@@ -67,13 +69,13 @@ function ResetInner() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 text-white rounded-2xl shadow-lg mb-4">
             <LockKeyhole className="h-8 w-8" />
           </div>
-          <h1 className="text-3xl font-bold">Set a new password</h1>
-          <p className="text-slate-500 mt-1">Choose something strong and unique.</p>
+          <h1 className="text-3xl font-bold">{t("auth.newPassword")}</h1>
+          <p className="text-slate-500 mt-1">{t("auth.newPasswordHint")}</p>
         </div>
         <div className="bg-white dark:bg-slate-800/90 rounded-2xl shadow-xl border border-slate-200/50 p-8">
           <form onSubmit={onSubmit} className="space-y-5">
             <Input
-              label="New password"
+              label={t("auth.newPassword")}
               type="password"
               required
               minLength={6}
@@ -82,7 +84,7 @@ function ResetInner() {
               onChange={(e) => setPassword(e.target.value)}
             />
             <Input
-              label="Confirm password"
+              label={t("auth.confirmPassword")}
               type="password"
               required
               placeholder="••••••••"
@@ -90,7 +92,7 @@ function ResetInner() {
               onChange={(e) => setConfirm(e.target.value)}
             />
             <Button type="submit" loading={saving} className="w-full">
-              Change password
+              {t("auth.updatePassword")}
             </Button>
           </form>
         </div>

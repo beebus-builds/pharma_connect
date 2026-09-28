@@ -1,6 +1,10 @@
 import nextConfig from "eslint-config-next";
 
 export default [
+  {
+    // Agent worktrees and tool state live inside the repo but are not app code.
+    ignores: [".kilo/**", ".freebuff/**", "node_modules/**", ".next/**"],
+  },
   ...nextConfig,
   {
     // These React Compiler-readiness rules flag several pre-existing
