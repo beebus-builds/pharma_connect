@@ -55,15 +55,15 @@ export default function ChatPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
       <div className="mb-4 flex items-center gap-3">
-        <Link href={request?.pharmacy ? "/dashboard/patient" : "/dashboard/pharmacy"} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">
+        <Link href={request?.pharmacy ? "/dashboard/patient" : "/dashboard/pharmacy"} className="p-2 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:ring-slate-300 dark:hover:ring-slate-600 transition-all" aria-label="Back to dashboard">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
             <MessageCircle className="h-5 w-5 text-primary-600" /> Chat
           </h1>
           {request && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {request.medicine.genericName} · {request.pharmacy.name} · {request.status}
             </p>
           )}

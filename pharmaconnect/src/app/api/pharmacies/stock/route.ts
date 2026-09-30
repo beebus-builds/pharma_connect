@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { stockUpsertSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rateLimit";
+import { resolveTenantLocation } from "@/lib/tenant";
 import { sendEmailInBackground } from "@/lib/mail";
 import { lowStockAlertEmail } from "@/lib/emails";
 import {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const stocks = await prisma.pharmacyStock.findMany({
     where: { pharmacyId: session.user.pharmacyId },
-    include: { medicine: true },
+    include: { medicine: true, location: { select: { id: true, name: true } } },
     orderBy: { updatedAt: "desc" },
   });
 
@@ -47,13 +48,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { medicineId, quantity, expiryDate, mrp, lowStockThreshold, clearExpiry } = parsed.data;
+    const { medicineId, locationId, quantity, expiryDate, mrp, lowStockThreshold, clearExpiry } = parsed.data;
     const pharmacyId = session.user.pharmacyId;
+
+    const location = await resolveTenantLocation(pharmacyId, locationId ?? null);
+    if (!location) {
+      return NextResponse.json({ error: "Branch not found for this pharmacy" }, { status: 404 });
+    }
 
     const [medicine, existing, pharmacy] = await Promise.all([
       prisma.medicine.findUnique({ where: { id: medicineId } }),
       prisma.pharmacyStock.findUnique({
-        where: { pharmacyId_medicineId: { pharmacyId, medicineId } },
+        where: { locationId_medicineId: { locationId: location.id, medicineId } },
       }),
       prisma.pharmacy.findUnique({
         where: { id: pharmacyId },
@@ -85,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     const stock = await prisma.$transaction(async (tx) => {
       const updated = await tx.pharmacyStock.upsert({
-        where: { pharmacyId_medicineId: { pharmacyId, medicineId } },
+        where: { locationId_medicineId: { locationId: location.id, medicineId } },
         update: {
           quantity,
           ...(expiryDate !== undefined ? { expiryDate } : {}),
@@ -97,6 +103,7 @@ export async function POST(req: NextRequest) {
         },
         create: {
           pharmacyId,
+          locationId: location.id,
           medicineId,
           quantity,
           expiryDate: expiryDate ?? null,
@@ -169,10 +176,16 @@ export async function DELETE(req: NextRequest) {
     if (!medicineId) {
       return NextResponse.json({ error: "medicineId is required" }, { status: 400 });
     }
+    const requestedLocationId = searchParams.get("locationId");
 
     const pharmacyId = session.user.pharmacyId;
+    const location = await resolveTenantLocation(pharmacyId, requestedLocationId);
+    if (!location) {
+      return NextResponse.json({ error: "Branch not found for this pharmacy" }, { status: 404 });
+    }
+
     const existing = await prisma.pharmacyStock.findUnique({
-      where: { pharmacyId_medicineId: { pharmacyId, medicineId } },
+      where: { locationId_medicineId: { locationId: location.id, medicineId } },
       include: { medicine: { select: { genericName: true } } },
     });
     if (!existing) {

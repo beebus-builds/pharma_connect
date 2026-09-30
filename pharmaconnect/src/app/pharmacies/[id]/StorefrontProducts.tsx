@@ -31,23 +31,23 @@ export default function StorefrontProducts({ pharmacy, canRequest }: Props) {
     );
   }, [pharmacy.products, query]);
 
-  async function handleRequest(medicineId: string, label: string) {
+  async function handleRequest(medicineId: string, locationId: string, label: string) {
     if (!canRequest) {
       toast.error("Please log in as a patient to send a request");
       router.push("/login");
       return;
     }
-    setRequestingId(medicineId);
+    setRequestingId(`${locationId}:${medicineId}`);
     try {
       const res = await fetch("/api/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pharmacyId: pharmacy.id, medicineId }),
+        body: JSON.stringify({ pharmacyId: pharmacy.id, medicineId, locationId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send request");
       toast.success(`Request sent to ${pharmacy.name} — opening chat…`);
-      setSentIds((prev) => new Set(prev).add(medicineId));
+      setSentIds((prev) => new Set(prev).add(`${locationId}:${medicineId}`));
       setTimeout(() => router.push(`/chat/${data.request.id}`), 600);
     } catch (e: any) {
       toast.error(e.message || "Something went wrong");
@@ -98,10 +98,19 @@ export default function StorefrontProducts({ pharmacy, canRequest }: Props) {
 
       <div className="space-y-2">
         {filtered.map((p) => {
-          const sent = sentIds.has(p.medicine.id);
+          const key = `${p.locationId}:${p.medicine.id}`;
+          const sent = sentIds.has(key);
           return (
-            <Card key={p.medicine.id} className="p-4 flex items-center justify-between gap-3">
-              <div className="min-w-0">
+            <Card key={key} className="p-4 flex items-center justify-between gap-3">
+              {p.medicine.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={p.medicine.imageUrl}
+                  alt={p.medicine.genericName}
+                  className="h-12 w-12 rounded-xl object-cover shrink-0"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1">
                 <p className="font-semibold text-sm">
                   {p.medicine.genericName}{" "}
                   <span className="text-slate-500 font-normal">
@@ -114,6 +123,7 @@ export default function StorefrontProducts({ pharmacy, canRequest }: Props) {
                     Qty: {p.quantity}
                   </span>
                   <StockBadge status={p.stockStatus} />
+                  <span className="text-[11px] font-medium text-slate-400">{p.locationName}</span>
                   {p.mrp !== null && (
                     <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                       Rs. {p.mrp}
@@ -133,9 +143,9 @@ export default function StorefrontProducts({ pharmacy, canRequest }: Props) {
               <Button
                 variant={sent ? "primary" : "secondary"}
                 className="text-xs px-4 py-2 shrink-0"
-                loading={requestingId === p.medicine.id}
+                loading={requestingId === `${p.locationId}:${p.medicine.id}`}
                 disabled={sent}
-                onClick={() => handleRequest(p.medicine.id, p.medicine.genericName)}
+                onClick={() => handleRequest(p.medicine.id, p.locationId, p.medicine.genericName)}
                 aria-label={`Request ${p.medicine.genericName} from ${pharmacy.name}`}
               >
                 {sent ? (

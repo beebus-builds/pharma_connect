@@ -105,25 +105,28 @@ export default function PharmacyCard({
   return (
     <Card
       className={cn(
-        "group p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-l-4 border-l-transparent hover:border-l-primary-600 focus-within:border-l-primary-600 focus-within:shadow-md",
+        "group p-5 hover:-translate-y-1 transition-all duration-300 overflow-hidden",
         highlighted &&
-          "border-l-primary-600 shadow-lg shadow-primary-600/10 ring-2 ring-primary-500/30 -translate-y-0.5 bg-primary-50/30 dark:bg-primary-950/20"
+          "ring-2 ring-primary-500/40 shadow-glow -translate-y-1"
       )}
       data-pharmacy-card={pharmacy.id}
     >
-      {/* Header: badges + title */}
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      {/* Header: badges + report */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <StockBadge status={pharmacy.stockStatus} />
         <DistanceBadge km={pharmacy.distanceKm} />
         {pharmacy.verified && <VerifiedBadge />}
-        <span className="ml-auto flex items-center gap-1 text-xs text-slate-400">
+        {pharmacy.sponsored && (
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sponsored</span>
+        )}
+        <span className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">
           <Clock className="h-3 w-3" />
           {formatRelativeTime(pharmacy.stockUpdatedAt)}
         </span>
         <button
           type="button"
           onClick={openReport}
-          className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
+          className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
           aria-label={t("card.reportAria", { name: pharmacy.name })}
           title={t("home.report")}
         >
@@ -138,7 +141,7 @@ export default function PharmacyCard({
               ? `/pharmacies/${pharmacy.id}?lat=${userLocation.lat}&lng=${userLocation.lng}`
               : `/pharmacies/${pharmacy.id}`
           }
-          className="relative h-11 w-11 rounded-xl overflow-hidden bg-primary-50 dark:bg-primary-950/40 border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center hover:ring-2 hover:ring-primary-500/30 transition-shadow"
+          className="relative h-12 w-12 rounded-2xl overflow-hidden bg-gradient-to-b from-primary-50 to-primary-100/60 dark:from-primary-500/15 dark:to-primary-500/5 ring-1 ring-slate-200 dark:ring-slate-700 shrink-0 flex items-center justify-center hover:ring-2 hover:ring-primary-500/40 transition-shadow"
           aria-label={t("card.storefrontAria", { name: pharmacy.name })}
           title={t("card.storefrontTitle")}
         >
@@ -146,55 +149,66 @@ export default function PharmacyCard({
             <img
               src={pharmacy.profileImageUrl}
               alt=""
-              width={44}
-              height={44}
+              width={48}
+              height={48}
               loading="lazy"
               decoding="async"
               className="absolute inset-0 h-full w-full object-cover"
             />
           ) : (
-            <Store className="h-5 w-5 text-primary-600" aria-hidden="true" />
+            <Store className="h-5 w-5 text-primary-600 dark:text-primary-400" aria-hidden="true" />
           )}
         </Link>
-        <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-slate-100 line-clamp-1 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors min-w-0">
-          <Link
-            href={
-              userLocation
-                ? `/pharmacies/${pharmacy.id}?lat=${userLocation.lat}&lng=${userLocation.lng}`
-                : `/pharmacies/${pharmacy.id}`
-            }
-            className="hover:underline underline-offset-2"
-            title={t("card.storefrontTitle")}
-          >
-            {pharmacy.name}
-          </Link>
-        </h3>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white line-clamp-1 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors">
+            <Link
+              href={
+                userLocation
+                  ? `/pharmacies/${pharmacy.id}?lat=${userLocation.lat}&lng=${userLocation.lng}`
+                  : `/pharmacies/${pharmacy.id}`
+              }
+              className="hover:underline underline-offset-2 decoration-primary-300"
+              title={t("card.storefrontTitle")}
+            >
+              {pharmacy.name}
+            </Link>
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{pharmacy.branchName} · {pharmacy.address}</p>
+        </div>
       </div>
-      <p className="text-sm text-slate-500 flex items-start gap-1.5 mt-1.5 line-clamp-2">
-        <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-        <span className="truncate">{pharmacy.address}</span>
-      </p>
-      <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-1">
-        <Phone className="h-3.5 w-3.5 shrink-0" />
-        <a href={`tel:${pharmacy.phone}`} className="hover:text-primary-600 hover:underline underline-offset-2">
+      <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-2">
+        <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <a href={`tel:${pharmacy.phone}`} className="hover:text-primary-600 hover:underline underline-offset-2 font-medium">
           {pharmacy.phone}
         </a>
       </p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 px-2.5 py-1.5 border border-slate-200 dark:border-slate-700">
-          <span className="font-bold text-slate-900 dark:text-slate-100">
-            {pharmacy.quantity} {t("card.units")}
-          </span>
-          <span className="text-slate-500 hidden sm:inline">{t("card.available")}</span>
-          <span className="text-slate-300">·</span>
-          <span className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-[120px]">{pharmacy.medicine.genericName}</span>
-        </span>
-        {pharmacy.mrp !== null && pharmacy.mrp !== undefined && (
-          <span className="inline-flex items-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1.5 border border-emerald-200 dark:border-emerald-900 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-            Rs. {pharmacy.mrp}
+      <div className="mt-3 flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 ring-1 ring-inset ring-slate-200/70 dark:ring-slate-700/70 p-2.5">
+        {pharmacy.medicine.imageUrl && !lite ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={pharmacy.medicine.imageUrl}
+            alt={pharmacy.medicine.genericName}
+            className="h-11 w-11 rounded-xl object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700"
+            loading="lazy"
+          />
+        ) : (
+          <span className="h-11 w-11 rounded-xl bg-white dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">
+            Rx
           </span>
         )}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+            {pharmacy.medicine.genericName}
+            <span className="font-medium text-slate-500"> · {pharmacy.medicine.brandName}</span>
+          </p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            {pharmacy.quantity} {t("card.units")} {t("card.available")}
+            {pharmacy.mrp !== null && pharmacy.mrp !== undefined && (
+              <span className="font-bold text-emerald-600 dark:text-emerald-400"> · Rs. {pharmacy.mrp}</span>
+            )}
+          </p>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

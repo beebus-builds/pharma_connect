@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { haversineDistanceKm, formatDistance, stockStatus } from "@/lib/utils";
 import { isValidLatLng } from "@/lib/geo";
 import { effectiveThreshold, isExpired } from "@/lib/inventory";
+import { effectivePlan } from "@/lib/plans";
 import { viberUrl, whatsappUrl } from "@/lib/contact";
 import { VerifiedBadge } from "@/components/ui/Badge";
 import ShareButtons from "@/components/ShareButtons";
@@ -25,8 +26,9 @@ async function getStorefront(id: string): Promise<PharmacyStorefrontDTO | null> 
     where: { id },
     include: {
       images: true,
+      locations: true,
       stocks: {
-        include: { medicine: true },
+        include: { medicine: true, location: { select: { id: true, name: true } } },
         orderBy: [{ quantity: "desc" }, { updatedAt: "desc" }],
       },
     },
@@ -47,10 +49,19 @@ async function getStorefront(id: string): Promise<PharmacyStorefrontDTO | null> 
     latitude: pharmacy.latitude,
     longitude: pharmacy.longitude,
     verified: pharmacy.verified,
+    plan: effectivePlan(pharmacy.plan, pharmacy.planExpiresAt, now),
     distanceKm: null,
     profileImageUrl: imageUrl("PROFILE"),
     coverImageUrl: imageUrl("COVER"),
     inStockCount: visibleStocks.filter((s) => s.quantity > 0).length,
+    branches: pharmacy.locations.map((l) => ({
+      id: l.id,
+      name: l.name,
+      address: l.address,
+      phone: l.phone ?? pharmacy.phone,
+      latitude: l.latitude,
+      longitude: l.longitude,
+    })),
     products: visibleStocks.map((s) => ({
       medicine: {
         id: s.medicine.id,
@@ -58,12 +69,15 @@ async function getStorefront(id: string): Promise<PharmacyStorefrontDTO | null> 
         brandName: s.medicine.brandName,
         strength: s.medicine.strength,
         manufacturer: s.medicine.manufacturer,
+        imageUrl: (s.medicine as { imageUrl?: string | null }).imageUrl ?? null,
       },
       quantity: s.quantity,
       stockStatus: stockStatus(s.quantity, effectiveThreshold(s.lowStockThreshold)),
       mrp: s.mrp ?? null,
       expiryDate: s.expiryDate ? s.expiryDate.toISOString() : null,
       updatedAt: s.updatedAt.toISOString(),
+      locationId: s.locationId,
+      locationName: s.location?.name ?? "Main branch",
     })),
   };
 }

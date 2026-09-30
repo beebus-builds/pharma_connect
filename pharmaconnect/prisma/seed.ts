@@ -143,16 +143,29 @@ async function main() {
             licenseNumber: p.licenseNumber,
             verified: true,
             verifiedAt: new Date(),
+            locations: {
+              create: {
+                name: "Main branch",
+                address: p.address,
+                phone: p.phone,
+                latitude: p.latitude,
+                longitude: p.longitude,
+                isPrimary: true,
+              },
+            },
           },
         },
       },
-      include: { pharmacy: true },
+      include: { pharmacy: { include: { locations: true } } },
     });
 
     if (!user.pharmacy) continue;
+    const primary = user.pharmacy.locations.find((l) => l.isPrimary) ?? user.pharmacy.locations[0];
+    if (!primary) continue;
 
     const stockData = medicines.map((medicine) => ({
       pharmacyId: user.pharmacy!.id,
+      locationId: primary.id,
       medicineId: medicine.id,
       quantity: randomStock(),
     }));

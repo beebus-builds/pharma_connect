@@ -86,22 +86,22 @@ function LoginInner() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-primary-50 dark:from-slate-950 dark:via-slate-900 dark:to-primary-950">
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary-400/10 rounded-full blur-[150px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-400/10 rounded-full blur-[150px]" />
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary-400/15 rounded-full blur-[150px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-sky-400/10 rounded-full blur-[150px]" />
       </div>
 
       <div className="relative w-full max-w-md mx-auto px-4 py-12 animate-fadeIn">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 text-white rounded-2xl shadow-lg shadow-primary-600/25 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-b from-primary-500 to-primary-600 text-white rounded-2xl shadow-[0_12px_32px_-8px_rgb(39_150_129/0.55)] ring-1 ring-inset ring-white/25 mb-4">
             <Stethoscope className="h-8 w-8" />
           </div>
-          <h1 className="text-3xl font-bold">{t("auth.welcomeBack")}</h1>
-          <p className="text-slate-500 mt-1">{t("auth.loginSubtitle")}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("auth.welcomeBack")}</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">{t("auth.loginSubtitle")}</p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800/90 backdrop-blur rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 p-8">
+        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-2xl shadow-card ring-1 ring-slate-200/80 dark:ring-slate-800 p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <Input
               label={t("auth.email")}
@@ -141,9 +141,9 @@ function LoginInner() {
           </form>
 
           {needsVerification && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              <p className="font-medium">{t("auth.emailNotVerified")}</p>
-              <p className="mt-1 text-amber-700">{t("auth.emailNotVerifiedHint")}</p>
+            <div className="mt-4 rounded-2xl ring-1 ring-inset ring-amber-600/20 bg-amber-50 dark:bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-300">
+              <p className="font-semibold">{t("auth.emailNotVerified")}</p>
+              <p className="mt-1 opacity-90">{t("auth.emailNotVerifiedHint")}</p>
               <Button
                 variant="outline"
                 className="mt-2 w-full"

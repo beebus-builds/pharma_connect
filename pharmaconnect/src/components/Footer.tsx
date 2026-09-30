@@ -43,17 +43,17 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pt-20 pb-10 transition-colors duration-300">
+    <footer className="bg-white dark:bg-slate-950 border-t border-slate-200/80 dark:border-slate-800 pt-16 pb-10 transition-colors duration-300">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-14">
           <div className="col-span-1 md:col-span-2">
-            <Link href="/" className="flex items-center gap-2 font-black text-2xl text-primary-700 dark:text-primary-400 mb-6 hover:opacity-80 transition-opacity">
-              <div className="p-1.5 bg-primary-600 text-white rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <Link href="/" className="inline-flex items-center gap-2.5 mb-5 hover:opacity-90 transition-opacity">
+              <div className="p-2 bg-gradient-to-b from-primary-500 to-primary-600 text-white rounded-xl shadow-md ring-1 ring-inset ring-white/25">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
-              PharmaConnect
+              <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">Pharma<span className="text-gradient">Connect</span></span>
             </Link>
-            <p className="text-slate-500 max-w-sm leading-relaxed mb-8 text-lg">
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm leading-relaxed mb-7">
               {t("footer.tagline")}
             </p>
             <div className="flex gap-4">

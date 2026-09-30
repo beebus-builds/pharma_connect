@@ -63,8 +63,9 @@ export default function PatientDashboard() {
     <div className="max-w-5xl mx-auto px-4 py-8 sm:py-10 animate-fadeIn">
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">My Requests</h1>
-          <p className="text-slate-500 mt-1 text-sm sm:text-base">Track requests & chat realtime with pharmacies</p>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-primary-600 dark:text-primary-400 mb-1">Patient console</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">My Requests</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base">Track requests & chat realtime with pharmacies</p>
         </div>
         <div className="flex gap-2 self-start sm:self-auto">
           <Link href="/chat">
@@ -92,10 +93,10 @@ export default function PatientDashboard() {
               key={s}
               onClick={() => setStatusFilter(s)}
               aria-pressed={statusFilter === s}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 ${
+              className={`px-3 py-1.5 rounded-full text-xs font-bold ring-1 ring-inset transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 ${
                 statusFilter === s
-                  ? "bg-primary-600 text-white border-primary-600 shadow-sm"
-                  : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+                  ? "bg-slate-900 text-white ring-slate-900 dark:bg-white dark:text-slate-900 dark:ring-white shadow-md"
+                  : "bg-white dark:bg-slate-900 ring-slate-200 dark:ring-slate-700 text-slate-600 dark:text-slate-300 hover:ring-slate-300 dark:hover:ring-slate-600"
               }`}
             >
               {s} {counts[s] > 0 && `(${counts[s]})`}
@@ -116,11 +117,11 @@ export default function PatientDashboard() {
       )}
 
       {!loading && requests.length === 0 && (
-        <Card className="p-16 text-center border-dashed border-2 border-slate-200 dark:border-slate-700">
-          <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Inbox className="h-10 w-10 text-slate-400" />
+        <Card className="p-16 text-center border-dashed !border-2">
+          <div className="w-20 h-20 bg-primary-50 dark:bg-primary-500/10 ring-1 ring-inset ring-primary-600/15 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Inbox className="h-10 w-10 text-primary-500" />
           </div>
-          <h3 className="text-xl font-bold mb-2">No requests yet</h3>
+          <h3 className="text-xl font-bold tracking-tight mb-2">No requests yet</h3>
           <p className="text-slate-500 text-sm mb-8 max-w-sm mx-auto">
             Search for a medicine on the homepage and send a request to a pharmacy if it&apos;s currently unavailable.
           </p>
@@ -145,7 +146,7 @@ export default function PatientDashboard() {
       {!loading && paged.length > 0 && (
         <>
           {/* Desktop table */}
-          <div className="hidden sm:block overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="hidden sm:block overflow-hidden rounded-2xl ring-1 ring-slate-200/80 dark:ring-slate-800 bg-white dark:bg-slate-900 shadow-card">
             <Table>
               <TableHeader>
                 <TableRow>

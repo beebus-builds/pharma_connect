@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { lookupKhaltiPayment, PHARMACY_SUBSCRIPTION_DAYS } from "@/lib/khalti";
+import { lookupKhaltiPayment } from "@/lib/khalti";
 import { sendEmailInBackground } from "@/lib/mail";
 import { subscriptionReceiptEmail } from "@/lib/emails";
+import { expiryAfterPurchase, getPlan, isPlan, renewalStart, PLAN_PERIOD_DAYS } from "@/lib/plans";
 
 function redirectTo(req: NextRequest, status: "success" | "failed" | "pending") {
   const url = new URL("/dashboard/pharmacy", req.url);
   url.searchParams.set("subscription", status);
   return NextResponse.redirect(url);
+}
+
+/** "SUBSCRIPTION:VERIFIED" -> "VERIFIED". Legacy rows stay on the default plan. */
+function planFromPurpose(purpose: string): ReturnType<typeof getPlan> {
+  const candidate = purpose.split(":")[1];
+  return getPlan(isPlan(candidate) ? candidate : "VERIFIED");
 }
 
 export async function GET(req: NextRequest) {
@@ -28,25 +35,38 @@ export async function GET(req: NextRequest) {
   }
 
   if (lookup.status === "Completed") {
-    const [updatedPayment, pharmacy] = await prisma.$transaction([
-      prisma.payment.update({
+    const plan = planFromPurpose(payment.purpose);
+
+    // Read-then-write inside one transaction: the renewal base is the pharmacy's
+    // plan expiry *now*, so paying early extends instead of discarding paid days,
+    // and two concurrent renewals cannot both read the same base.
+    const { pharmacy, payment: updatedPayment, expiresAt } = await prisma.$transaction(async (tx) => {
+      const current = await tx.pharmacy.findUnique({
+        where: { id: payment.pharmacyId },
+        select: { planExpiresAt: true },
+      });
+      const now = new Date();
+      const expiresAt = expiryAfterPurchase(renewalStart(current?.planExpiresAt ?? null, now), PLAN_PERIOD_DAYS);
+
+      const updated = await tx.payment.update({
         where: { id: payment.id },
         data: { status: "COMPLETED", transactionId: lookup.transaction_id },
-      }),
-      prisma.pharmacy.update({
+      });
+      const updatedPharmacy = await tx.pharmacy.update({
         where: { id: payment.pharmacyId },
-        data: {
-          subscriptionActive: true,
-          subscriptionExpiresAt: new Date(Date.now() + PHARMACY_SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000),
-        },
+        data: { plan: plan.plan, planExpiresAt: expiresAt },
         include: { user: { select: { email: true } } },
-      }),
-    ]);
+      });
+      return { pharmacy: updatedPharmacy, payment: updated, expiresAt } as const;
+    });
+
     if (pharmacy.user?.email) {
       const tpl = subscriptionReceiptEmail({
         pharmacyName: pharmacy.name,
         amount: updatedPayment.amount,
         transactionId: updatedPayment.transactionId,
+        planLabel: plan.label,
+        expiresAt,
       });
       sendEmailInBackground({
         to: pharmacy.user.email,

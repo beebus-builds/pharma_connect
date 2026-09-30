@@ -45,31 +45,46 @@ enum PharmacyImageKind {
   COVER
 }
 
-model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(PATIENT)
-  emailVerified Boolean @default(false)
-  verificationToken String?
-  verificationTokenExpires DateTime?
-  passwordResetToken String? @unique
-  passwordResetExpires DateTime?
-  createdAt DateTime @default(now())
+/// SPECS 4D. `plan` is the *current* tier; `planExpiresAt` is when it lapses.
+/// An expired plan is not a separate state to keep in sync — it is derived, so
+/// there is no way for a stored boolean to drift out of date.
+enum PharmacyPlan {
+  FREE
+  VERIFIED
+  FEATURED
+}
 
-  pharmacy Pharmacy?
-  requests Request[] @relation("PatientRequests")
-  messages Message[]
-  reports  Report[]  @relation("ReporterReports")
+enum SearchOutcome {
+  RESOLVED
+  UNRESOLVED
+}
+
+model User {
+  id                       String    @id @default(cuid())
+  name                     String
+  email                    String    @unique
+  password                 String
+  role                     Role      @default(PATIENT)
+  emailVerified            Boolean   @default(false)
+  verificationToken        String?
+  verificationTokenExpires DateTime?
+  passwordResetToken       String?   @unique
+  passwordResetExpires     DateTime?
+  createdAt                DateTime  @default(now())
+
+  pharmacy  Pharmacy?
+  requests  Request[]  @relation("PatientRequests")
+  messages  Message[]
+  reports   Report[]   @relation("ReporterReports")
+  reminders Reminder[]
 
   @@index([email])
 }
 
 model Pharmacy {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String                                 @id @default(cuid())
+  userId        String                                 @unique
+  user          User                                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
   address       String
   phone         String
@@ -78,15 +93,16 @@ model Pharmacy {
   location      Unsupported("geography(Point, 4326)")?
   licenseNumber String?
 
-  stocks   PharmacyStock[]
-  requests Request[]       @relation("PharmacyRequests")
-  payments Payment[]
-  reports  Report[]        @relation("PharmacyReports")
-  images   PharmacyImage[]
+  stocks       PharmacyStock[]
+  requests     Request[]       @relation("PharmacyRequests")
+  payments     Payment[]
+  reports      Report[]        @relation("PharmacyReports")
+  images       PharmacyImage[]
   stockHistory StockHistory[]
+  locations    Location[]
 
-  subscriptionActive    Boolean   @default(false)
-  subscriptionExpiresAt DateTime?
+  plan          PharmacyPlan @default(FREE)
+  planExpiresAt DateTime?
 
   verified   Boolean   @default(false)
   verifiedAt DateTime?
@@ -96,56 +112,109 @@ model Pharmacy {
   @@index([latitude, longitude])
   @@index([location], type: Gist, map: "Pharmacy_location_gist_idx")
   @@index([name])
+  @@index([plan, planExpiresAt])
+}
+
+/// SPECS 4C: a branch. One login can manage N of these, each with its own pin,
+/// address, phone and stock. The owning Pharmacy keeps its own address fields as
+/// the chain-level fallback so existing rows and emails keep working.
+model Location {
+  id         String                                 @id @default(cuid())
+  pharmacyId String
+  pharmacy   Pharmacy                               @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  name       String                                 @db.VarChar(80)
+  address    String
+  phone      String?
+  latitude   Float
+  longitude  Float
+  location   Unsupported("geography(Point, 4326)")?
+  isPrimary  Boolean                                @default(false)
+  createdAt  DateTime                               @default(now())
+  updatedAt  DateTime                               @updatedAt
+
+  stocks   PharmacyStock[]
+  requests Request[]
+
+  @@index([pharmacyId])
+  @@index([latitude, longitude])
+  @@index([location], type: Gist, map: "Location_gist_idx")
+  @@index([isPrimary])
+}
+
+/// SPECS 4B: demand signal for pharmacies. Only anonymous aggregates are ever
+/// surfaced; nothing here is joined to an individual patient in any API response.
+model SearchLog {
+  id         String        @id @default(cuid())
+  query      String        @db.VarChar(120)
+  medicineId String?
+  medicine   Medicine?     @relation(fields: [medicineId], references: [id], onDelete: SetNull)
+  latitude   Float
+  longitude  Float
+  outcome    SearchOutcome
+  createdAt  DateTime      @default(now())
+
+  @@index([createdAt])
+  @@index([medicineId, createdAt])
+  @@index([outcome, createdAt])
+  @@index([latitude, longitude])
 }
 
 model Payment {
-  id         String        @id @default(cuid())
-  pharmacyId String
-  pharmacy   Pharmacy      @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  purpose    String        @default("SUBSCRIPTION")
-  amount     Int
-  status     PaymentStatus @default(PENDING)
-  pidx       String?       @unique
+  id            String        @id @default(cuid())
+  pharmacyId    String
+  pharmacy      Pharmacy      @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  purpose       String        @default("SUBSCRIPTION")
+  amount        Int
+  status        PaymentStatus @default(PENDING)
+  pidx          String?       @unique
   transactionId String?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@index([pharmacyId])
   @@index([status])
 }
 
 model Medicine {
-  id           String @id @default(cuid())
+  id           String  @id @default(cuid())
   genericName  String
   brandName    String
   strength     String
   manufacturer String
+  /// Catalog pack shot. Shared across pharmacies — set once when the
+  /// product is added, replaceable from the pharmacy dashboard.
+  imageUrl     String?
 
-  stocks   PharmacyStock[]
+  stocks       PharmacyStock[]
   stockHistory StockHistory[]
-  requests Request[]
+  requests     Request[]
+  searchLogs   SearchLog[]
+  reminders    Reminder[]
 
   @@index([genericName])
   @@index([brandName])
 }
 
 model PharmacyStock {
-  id         String   @id @default(cuid())
-  pharmacyId String
-  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  medicineId String
-  medicine   Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
-  quantity   Int      @default(0)
+  id                  String    @id @default(cuid())
+  pharmacyId          String
+  pharmacy            Pharmacy  @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  locationId          String
+  location            Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  medicineId          String
+  medicine            Medicine  @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  quantity            Int       @default(0)
   // Production inventory fields
   expiryDate          DateTime?
   mrp                 Int?
   lowStockThreshold   Int       @default(10)
   lowStockAlertSentAt DateTime?
-  updatedAt  DateTime @updatedAt
+  updatedAt           DateTime  @updatedAt
 
-  @@unique([pharmacyId, medicineId])
+  @@unique([locationId, medicineId])
   @@index([medicineId])
   @@index([pharmacyId])
+  @@index([locationId])
   @@index([expiryDate])
 }
 
@@ -167,30 +236,76 @@ model StockHistory {
 }
 
 model Request {
-  id         String        @id @default(cuid())
-  patientId  String
-  patient    User          @relation("PatientRequests", fields: [patientId], references: [id], onDelete: Cascade)
-  pharmacyId String
-  pharmacy   Pharmacy      @relation("PharmacyRequests", fields: [pharmacyId], references: [id], onDelete: Cascade)
-  medicineId String
-  medicine   Medicine      @relation(fields: [medicineId], references: [id], onDelete: Cascade)
-  status     RequestStatus @default(PENDING)
-  createdAt  DateTime      @default(now())
+  id           String                  @id @default(cuid())
+  patientId    String
+  patient      User                    @relation("PatientRequests", fields: [patientId], references: [id], onDelete: Cascade)
+  pharmacyId   String
+  pharmacy     Pharmacy                @relation("PharmacyRequests", fields: [pharmacyId], references: [id], onDelete: Cascade)
+  locationId   String
+  location     Location                @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  medicineId   String
+  medicine     Medicine                @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  status       RequestStatus           @default(PENDING)
+  createdAt    DateTime                @default(now())
   conversation Conversation?
+  prescription PrescriptionAttachment?
 
   @@index([patientId])
   @@index([pharmacyId])
+  @@index([locationId])
   @@index([status])
 }
 
+/// SPECS 5A. Prescription images are held for review before a pharmacy sees them.
+enum PrescriptionReview {
+  PENDING
+  APPROVED
+  REJECTED
+  DELETED
+}
+
+model PrescriptionAttachment {
+  id        String             @id @default(cuid())
+  requestId String             @unique
+  request   Request            @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  url       String
+  review    PrescriptionReview @default(PENDING)
+  /// Set once the retention window closes and the blob is deleted. Kept as a row
+  /// so we can prove the deletion happened, without keeping the image.
+  deletedAt DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([review, createdAt])
+}
+
+/// SPECS 5B: "your 30-day course ends Friday". Driven by /api/cron/reminders.
+model Reminder {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medicineId     String
+  medicine       Medicine  @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  daysSupply     Int       @default(30)
+  nextDue        DateTime
+  active         Boolean   @default(true)
+  /// Guards against re-emailing the same reminder on every cron tick.
+  lastNotifiedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, medicineId])
+  @@index([active, nextDue])
+}
+
 model Conversation {
-  id         String   @id @default(cuid())
-  requestId  String   @unique
-  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  id         String    @id @default(cuid())
+  requestId  String    @unique
+  request    Request   @relation(fields: [requestId], references: [id], onDelete: Cascade)
   patientId  String
   pharmacyId String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   messages   Message[]
 
   @@index([patientId])

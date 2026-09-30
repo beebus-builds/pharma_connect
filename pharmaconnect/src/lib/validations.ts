@@ -89,6 +89,8 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export const stockUpsertSchema = z.object({
   medicineId: z.string().min(1),
+  /** SPECS 4C: which branch. Omitted means the chain's primary branch. */
+  locationId: z.string().min(1).optional(),
   quantity: z.coerce.number().int().min(0, "Quantity cannot be negative").max(1000000),
   // Optional production fields — empty string from the form counts as "not set".
   expiryDate: z.preprocess(
@@ -108,9 +110,57 @@ export const stockUpsertSchema = z.object({
 
 export type StockUpsertInput = z.infer<typeof stockUpsertSchema>;
 
+const optionalTrimmed = (max: number) =>
+  z.preprocess((v) => (v === "" || v === null ? undefined : v), z.string().trim().max(max).optional());
+
+/** SPECS 4C. A branch always has a real pin inside Nepal. */
+export const locationCreateSchema = z.object({
+  name: z.string().trim().min(2, "Branch name is required").max(80),
+  address: z.string().trim().min(3, "Address is required").max(200),
+  phone: optionalTrimmed(30),
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
+  isPrimary: z.boolean().optional(),
+});
+
+export type LocationCreateInput = z.infer<typeof locationCreateSchema>;
+
+export const locationUpdateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(2).max(80).optional(),
+  address: z.string().trim().min(3).max(200).optional(),
+  phone: z.preprocess((v) => (v === "" ? null : v), z.string().trim().max(30).nullable().optional()),
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
+  isPrimary: z.boolean().optional(),
+});
+
+export type LocationUpdateInput = z.infer<typeof locationUpdateSchema>;
+
+/** SPECS 5B: refill reminder. Days of supply is what sets the cadence. */
+export const reminderCreateSchema = z.object({
+  medicineId: z.string().min(1),
+  daysSupply: z.coerce.number().int().min(1, "Must be at least 1 day").max(365).default(30),
+  /** Days of warning before the course is expected to run out. */
+  leadDays: z.coerce.number().int().min(0).max(30).default(3),
+});
+
+export type ReminderCreateInput = z.infer<typeof reminderCreateSchema>;
+
+export const reminderUpdateSchema = z.object({
+  medicineId: z.string().min(1),
+  active: z.boolean().optional(),
+  daysSupply: z.coerce.number().int().min(1).max(365).optional(),
+  leadDays: z.coerce.number().int().min(0).max(30).optional(),
+});
+
+export type ReminderUpdateInput = z.infer<typeof reminderUpdateSchema>;
+
 export const requestCreateSchema = z.object({
   pharmacyId: z.string().min(1),
   medicineId: z.string().min(1),
+  /** SPECS 4C: which branch. Omitted means the chain's primary branch. */
+  locationId: z.string().min(1).optional(),
 });
 
 export type RequestCreateInput = z.infer<typeof requestCreateSchema>;

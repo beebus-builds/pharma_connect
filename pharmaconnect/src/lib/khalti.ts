@@ -1,8 +1,7 @@
 const KHALTI_BASE_URL = process.env.KHALTI_BASE_URL || "https://dev.khalti.com/api/v2";
 
-// NPR, in paisa (1 rupee = 100 paisa). Khalti requires amount in paisa.
-export const PHARMACY_SUBSCRIPTION_AMOUNT_PAISA = 99900; // NPR 999/month
-export const PHARMACY_SUBSCRIPTION_DAYS = 30;
+// Amounts are no longer hardcoded here — pricing lives in src/lib/plans.ts and is
+// read from PLAN_PRICE_NPR_* at request time.
 
 interface InitiateParams {
   amount: number;

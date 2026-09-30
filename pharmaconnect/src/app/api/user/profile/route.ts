@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { daysRemaining, effectivePlan, getPlanCatalog } from "@/lib/plans";
 
 export async function GET(req: NextRequest) {
   try {
@@ -30,8 +31,8 @@ export async function GET(req: NextRequest) {
             licenseNumber: true,
             verified: true,
             verifiedAt: true,
-            subscriptionActive: true,
-            subscriptionExpiresAt: true,
+            plan: true,
+            planExpiresAt: true,
             createdAt: true,
           },
         },
@@ -42,7 +43,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ user });
+    // The plan is stored, but what the UI should act on is the *effective* tier —
+    // a lapsed plan reads as FREE without anything needing to be written back.
+    return NextResponse.json({
+      user: {
+        ...user,
+        pharmacy: user.pharmacy
+          ? {
+              ...user.pharmacy,
+              effectivePlan: effectivePlan(user.pharmacy.plan, user.pharmacy.planExpiresAt),
+              daysRemaining: daysRemaining(user.pharmacy.plan, user.pharmacy.planExpiresAt),
+            }
+          : null,
+      },
+      // Prices are env-driven, so the client renders whatever ops configured.
+      plans: getPlanCatalog().map(({ plan, priceRupees, label, benefits, rank, paid }) => ({
+        plan,
+        priceRupees,
+        label,
+        benefits,
+        rank,
+        paid,
+      })),
+    });
   } catch (error) {
     console.error("Get profile error:", error);
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });

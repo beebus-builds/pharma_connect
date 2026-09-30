@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rateLimit";
 import { parseCsv } from "@/lib/csv";
 import { medicineCreateSchema } from "@/lib/validations";
+import { resolveTenantLocation } from "@/lib/tenant";
 import {
   CSV_MAX_BYTES,
   CSV_MAX_ROWS,
@@ -63,6 +64,10 @@ export async function POST(req: NextRequest) {
     }
 
     const pharmacyId = session.user.pharmacyId;
+    const location = await resolveTenantLocation(pharmacyId, null);
+    if (!location) {
+      return NextResponse.json({ error: "No branch found for this pharmacy" }, { status: 404 });
+    }
     let created = 0;
     let updated = 0;
     let expiredHidden = 0;
@@ -133,13 +138,13 @@ export async function POST(req: NextRequest) {
         }
 
         const existing = await prisma.pharmacyStock.findUnique({
-          where: { pharmacyId_medicineId: { pharmacyId, medicineId: medicine.id } },
+          where: { locationId_medicineId: { locationId: location.id, medicineId: medicine.id } },
         });
         const oldQuantity = existing?.quantity ?? 0;
 
         await prisma.$transaction([
           prisma.pharmacyStock.upsert({
-            where: { pharmacyId_medicineId: { pharmacyId, medicineId: medicine.id } },
+            where: { locationId_medicineId: { locationId: location.id, medicineId: medicine.id } },
             update: {
               quantity,
               mrp,
@@ -149,6 +154,7 @@ export async function POST(req: NextRequest) {
             },
             create: {
               pharmacyId,
+              locationId: location.id,
               medicineId: medicine.id,
               quantity,
               mrp,

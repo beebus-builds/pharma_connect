@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { Plus, PackageCheck, Pill, ClipboardList, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Search, Minus, MessageCircle, ImagePlus, Trash2 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import PhotoManager from "@/components/PhotoManager";
+import PlanCard, { type PlanDefinitionDTO } from "@/components/PlanCard";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -41,8 +42,8 @@ interface HistoryRow {
 }
 
 interface SubscriptionInfo {
-  active: boolean;
-  expiresAt: string | null;
+  plan: string;
+  daysRemaining: number | null;
 }
 
 export default function PharmacyDashboard() {
@@ -56,6 +57,7 @@ export default function PharmacyDashboard() {
 function PharmacyDashboardContent() {
   const searchParams = useSearchParams();
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [planCatalog, setPlanCatalog] = useState<PlanDefinitionDTO[]>([]);
   const [subscribing, setSubscribing] = useState(false);
   const [stocks, setStocks] = useState<StockRow[]>([]);
   const [requests, setRequests] = useState<RequestDTO[]>([]);
@@ -71,6 +73,9 @@ function PharmacyDashboardContent() {
   const [showNewProduct, setShowNewProduct] = useState(false);
   const [newProduct, setNewProduct] = useState<MedicineCreateInput>({ genericName: "", brandName: "", strength: "", manufacturer: "" });
   const [creatingProduct, setCreatingProduct] = useState(false);
+  const [newProductPhoto, setNewProductPhoto] = useState<File | null>(null);
+  const [newProductPhotoPreview, setNewProductPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const {
@@ -120,25 +125,13 @@ function PharmacyDashboardContent() {
       const res = await fetch("/api/user/profile");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load subscription");
+      if (Array.isArray(data.plans)) setPlanCatalog(data.plans);
       setSubscription({
-        active: !!data.user?.pharmacy?.subscriptionActive,
-        expiresAt: data.user?.pharmacy?.subscriptionExpiresAt ?? null,
+        plan: data.user?.pharmacy?.effectivePlan ?? "FREE",
+        daysRemaining: data.user?.pharmacy?.daysRemaining ?? null,
       });
     } catch {
       // Non-critical for page load; subscription card just won't render.
-    }
-  }
-
-  async function handleSubscribe() {
-    setSubscribing(true);
-    try {
-      const res = await fetch("/api/payments/khalti/initiate", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to start payment");
-      window.location.href = data.paymentUrl;
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
-      setSubscribing(false);
     }
   }
 
@@ -283,6 +276,49 @@ function PharmacyDashboardContent() {
     }
   }
 
+  async function uploadMedicinePhoto(medicineId: string, file: File): Promise<string | null> {
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be 5 MB or smaller.");
+      return null;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Only JPG, PNG or WebP images are allowed.");
+      return null;
+    }
+    setUploadingPhoto(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`/api/medicines/${medicineId}/photo`, { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Photo upload failed");
+      return data.medicine?.imageUrl ?? null;
+    } catch (e: any) {
+      toast.error(e.message || "Photo upload failed");
+      return null;
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function removeMedicinePhoto(medicineId: string) {
+    setUploadingPhoto(true);
+    try {
+      const res = await fetch(`/api/medicines/${medicineId}/photo`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to remove photo");
+      setSelectedMedicine((prev) => (prev && prev.id === medicineId ? { ...prev, imageUrl: null } : prev));
+      setStocks((prev) =>
+        prev.map((s) => (s.medicine.id === medicineId ? { ...s, medicine: { ...s.medicine, imageUrl: null } } : s))
+      );
+      toast.success("Product photo removed");
+    } catch (e: any) {
+      toast.error(e.message || "Something went wrong");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
   async function createNewProduct(e: React.FormEvent) {
     e.preventDefault();
     const parsed = medicineCreateSchema.safeParse(newProduct);
@@ -300,9 +336,19 @@ function PharmacyDashboardContent() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to add product");
-      setSelectedMedicine(data.medicine);
-      setValue("medicineId", data.medicine.id);
+      let medicine = data.medicine as MedicineDTO;
+      if (newProductPhoto) {
+        const url = await uploadMedicinePhoto(medicine.id, newProductPhoto);
+        if (url) medicine = { ...medicine, imageUrl: url };
+      }
+      setSelectedMedicine(medicine);
+      setValue("medicineId", medicine.id);
       setNewProduct({ genericName: "", brandName: "", strength: "", manufacturer: "" });
+      setNewProductPhoto(null);
+      setNewProductPhotoPreview((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
       setShowNewProduct(false);
       toast.success(data.message || "Product added — set quantity and save stock");
     } catch (err: any) {
@@ -324,8 +370,9 @@ function PharmacyDashboardContent() {
     <div className="max-w-5xl mx-auto px-4 py-10 animate-fadeIn">
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Pharmacy Dashboard</h1>
-          <p className="text-slate-500 mt-1">Inventory and realtime patient chats</p>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-primary-600 dark:text-primary-400 mb-1">Pharmacy console</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Pharmacy Dashboard</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">Inventory and realtime patient chats</p>
         </div>
         <a href="/chat" className="self-start sm:self-auto">
           <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-sm font-semibold hover:opacity-90 transition-opacity">
@@ -334,26 +381,12 @@ function PharmacyDashboardContent() {
         </a>
       </div>
 
-      {subscription && (
-        <Card className="mb-8 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <p className="font-semibold">
-              Subscription: {subscription.active ? (
-                <span className="text-emerald-600">Active</span>
-              ) : (
-                <span className="text-amber-600">Inactive</span>
-              )}
-            </p>
-            <p className="text-sm text-slate-500">
-              {subscription.active && subscription.expiresAt
-                ? `Renews/expires ${new Date(subscription.expiresAt).toLocaleDateString()}`
-                : "Subscribe to keep your pharmacy listed and receive patient requests."}
-            </p>
-          </div>
-          <Button onClick={handleSubscribe} disabled={subscribing} variant={subscription.active ? "outline" : "primary"}>
-            {subscribing ? "Redirecting…" : subscription.active ? "Renew (NPR 999/mo)" : "Subscribe (NPR 999/mo)"}
-          </Button>
-        </Card>
+      {subscription && planCatalog.length > 0 && (
+        <PlanCard
+          currentPlan={subscription.plan as "FREE" | "VERIFIED" | "FEATURED"}
+          daysRemaining={subscription.daysRemaining}
+          catalog={planCatalog}
+        />
       )}
 
       {/* Stock Health Overview */}
@@ -536,6 +569,63 @@ function PharmacyDashboardContent() {
                   onClear={() => setSelectedMedicine(null)}
                 />
                 {errors.medicineId && <p className="text-xs text-red-600 mt-1">{errors.medicineId.message}</p>}
+                {selectedMedicine && (
+                  <div className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-2.5">
+                    {selectedMedicine.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={selectedMedicine.imageUrl}
+                        alt={selectedMedicine.genericName}
+                        className="h-12 w-12 rounded-lg object-cover shrink-0"
+                      />
+                    ) : (
+                      <span className="h-12 w-12 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs text-slate-400 shrink-0">
+                        No photo
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold truncate">{selectedMedicine.genericName}</p>
+                      <div className="flex gap-2 mt-1">
+                        <label className={`text-[11px] font-bold cursor-pointer text-primary-600 hover:underline ${uploadingPhoto ? "opacity-50 pointer-events-none" : ""}`}>
+                          {uploadingPhoto ? "Uploading…" : selectedMedicine.imageUrl ? "Replace photo" : "Add photo"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            disabled={uploadingPhoto}
+                            onChange={async (e) => {
+                              const f = e.target.files?.[0];
+                              e.target.value = "";
+                              if (!f || !selectedMedicine) return;
+                              const url = await uploadMedicinePhoto(selectedMedicine.id, f);
+                              if (url) {
+                                setSelectedMedicine({ ...selectedMedicine, imageUrl: url });
+                                setStocks((prev) =>
+                                  prev.map((s) =>
+                                    s.medicine.id === selectedMedicine.id
+                                      ? { ...s, medicine: { ...s.medicine, imageUrl: url } }
+                                      : s
+                                  )
+                                );
+                                toast.success("Product photo updated");
+                              }
+                            }}
+                          />
+                        </label>
+                        {selectedMedicine.imageUrl && (
+                          <button
+                            type="button"
+                            disabled={uploadingPhoto}
+                            onClick={() => removeMedicinePhoto(selectedMedicine.id)}
+                            className="text-[11px] font-bold text-red-600 hover:underline disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowNewProduct(true)}
@@ -723,6 +813,14 @@ function PharmacyDashboardContent() {
                 <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
                   {filtered.map((row, i) => (
                     <Card key={row.id} className="p-4 flex items-center justify-between gap-3 hover:shadow-md transition-shadow animate-fadeIn" style={{ animationDelay: `${i * 20}ms` }}>
+                      {row.medicine.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={row.medicine.imageUrl}
+                          alt={row.medicine.genericName}
+                          className="h-12 w-12 rounded-xl object-cover shrink-0"
+                        />
+                      ) : null}
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-sm">{row.medicine.genericName}</p>
                         <p className="text-xs text-slate-500 truncate">
@@ -849,6 +947,58 @@ function PharmacyDashboardContent() {
                 value={newProduct.manufacturer}
                 onChange={(e) => setNewProduct((p) => ({ ...p, manufacturer: e.target.value }))}
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Pack photo (optional)
+              </label>
+              <div className="flex items-center gap-3">
+                {newProductPhotoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={newProductPhotoPreview} alt="Pack preview" className="h-14 w-14 rounded-xl object-cover shrink-0" />
+                ) : (
+                  <span className="h-14 w-14 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] text-slate-400 shrink-0">
+                    No photo
+                  </span>
+                )}
+                <div className="flex-1">
+                  <label className="text-xs font-bold cursor-pointer text-primary-600 hover:underline">
+                    Choose JPG/PNG/WebP ≤ 5 MB
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        e.target.value = "";
+                        setNewProductPhoto(f);
+                        setNewProductPhotoPreview((prev) => {
+                          if (prev) URL.revokeObjectURL(prev);
+                          return f ? URL.createObjectURL(f) : null;
+                        });
+                      }}
+                    />
+                  </label>
+                  {newProductPhoto && (
+                    <p className="text-[11px] text-slate-500 truncate mt-0.5">{newProductPhoto.name}</p>
+                  )}
+                </div>
+                {newProductPhoto && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewProductPhoto(null);
+                      setNewProductPhotoPreview((prev) => {
+                        if (prev) URL.revokeObjectURL(prev);
+                        return null;
+                      });
+                    }}
+                    className="text-[11px] font-bold text-red-600 hover:underline shrink-0"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex gap-2">
               <Button type="button" variant="secondary" className="flex-1 text-xs" onClick={() => setShowNewProduct(false)}>

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requestCreateSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rateLimit";
+import { resolveTenantLocation } from "@/lib/tenant";
 import { sendEmailInBackground } from "@/lib/mail";
 import { newRequestEmail } from "@/lib/emails";
 
@@ -19,7 +20,8 @@ export async function GET(req: NextRequest) {
         include: {
           patient: { select: { id: true, name: true, email: true } },
           pharmacy: { select: { id: true, name: true } },
-          medicine: { select: { id: true, genericName: true, brandName: true } },
+          location: true,
+          medicine: true,
         },
         orderBy: { createdAt: "desc" },
       })
@@ -28,7 +30,8 @@ export async function GET(req: NextRequest) {
         include: {
           patient: { select: { id: true, name: true, email: true } },
           pharmacy: { select: { id: true, name: true } },
-          medicine: { select: { id: true, genericName: true, brandName: true } },
+          location: true,
+          medicine: true,
         },
         orderBy: { createdAt: "desc" },
       });
@@ -56,7 +59,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { pharmacyId, medicineId } = parsed.data;
+    const { pharmacyId, medicineId, locationId } = parsed.data;
 
     const [pharmacy, medicine] = await Promise.all([
       prisma.pharmacy.findUnique({
@@ -69,16 +72,21 @@ export async function POST(req: NextRequest) {
     if (!pharmacy) return NextResponse.json({ error: "Pharmacy not found" }, { status: 404 });
     if (!medicine) return NextResponse.json({ error: "Medicine not found" }, { status: 404 });
 
+    const location = await resolveTenantLocation(pharmacyId, locationId ?? null);
+    if (!location) return NextResponse.json({ error: "Branch not found" }, { status: 404 });
+
     const request = await prisma.request.create({
       data: {
         patientId: session.user.id,
         pharmacyId,
+        locationId: location.id,
         medicineId,
         status: "PENDING",
       },
       include: {
         patient: { select: { id: true, name: true, email: true } },
         pharmacy: { select: { id: true, name: true } },
+        location: true,
         medicine: { select: { id: true, genericName: true, brandName: true, strength: true } },
       },
     });

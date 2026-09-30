@@ -3,17 +3,19 @@
 @tailwind utilities;
 
 :root {
-  --background: 255 255 255;
+  --background: 248 250 252;
   --foreground: 15 23 42;
 }
 
 .dark {
-  --background: 15 23 42;
+  --background: 2 6 23;
   --foreground: 241 245 249;
 }
 
 html {
   scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -37,10 +39,67 @@ html {
 body {
   background-color: rgb(var(--background));
   color: rgb(var(--foreground));
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 ::selection {
-  background-color: rgb(33 122 105 / 0.3);
+  background-color: rgb(39 150 129 / 0.25);
+}
+
+/* Premium ambient background — soft radial washes, light + dark aware. */
+.bg-premium {
+  position: relative;
+  isolation: isolate;
+}
+
+.bg-scene {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42rem 22rem at 12% -6%, rgb(39 150 129 / 0.10), transparent 60%),
+    radial-gradient(36rem 20rem at 88% 4%, rgb(56 189 248 / 0.08), transparent 60%),
+    radial-gradient(48rem 28rem at 50% 110%, rgb(39 150 129 / 0.06), transparent 60%);
+}
+
+.dark .bg-scene {
+  background:
+    radial-gradient(42rem 22rem at 12% -6%, rgb(39 150 129 / 0.14), transparent 60%),
+    radial-gradient(36rem 20rem at 88% 4%, rgb(56 189 248 / 0.10), transparent 60%),
+    radial-gradient(48rem 28rem at 50% 110%, rgb(39 150 129 / 0.08), transparent 60%);
+}
+
+.text-gradient {
+  background: linear-gradient(100deg, #0f766e 10%, #279681 45%, #0ea5a4 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dark .text-gradient {
+  background: linear-gradient(100deg, #5eead4 0%, #2dd4bf 45%, #67e8f9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.glass {
+  background: rgb(255 255 255 / 0.72);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+.dark .glass {
+  background: rgb(15 23 42 / 0.62);
+}
+
+.ring-premium {
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.06), 0 1px 2px rgb(15 23 42 / 0.04), 0 12px 32px -16px rgb(15 23 42 / 0.14);
+}
+
+.dark .ring-premium {
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.07), 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.5);
 }
 
 ::-webkit-scrollbar {

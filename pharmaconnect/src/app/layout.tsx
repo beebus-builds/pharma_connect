@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import Navbar from "@/components/Navbar";
@@ -9,6 +10,12 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getSiteUrl } from "@/lib/seo";
 
 const siteUrl = getSiteUrl();
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -50,11 +57,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
-      <body className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 antialiased font-sans">
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className={inter.variable}>
+      <body className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased font-sans tracking-[-0.011em] bg-premium">
+        <div aria-hidden="true" className="bg-scene" />
         <Providers>
           <Navbar />
-          <main id="main-content" className="min-h-[calc(100vh-64px)] focus:outline-none" tabIndex={-1}>
+          <main id="main-content" className="relative min-h-[calc(100vh-64px)] focus:outline-none" tabIndex={-1}>
             <PageWrapper>
               <ErrorBoundary>
                 {children}

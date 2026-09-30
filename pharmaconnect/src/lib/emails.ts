@@ -213,14 +213,17 @@ export function subscriptionReceiptEmail(opts: {
   pharmacyName: string;
   amount: number;
   transactionId?: string | null;
+  planLabel: string;
+  expiresAt: Date;
 }) {
+  const validUntil = opts.expiresAt.toISOString().slice(0, 10);
   return {
-    subject: "PharmaConnect subscription activated",
-    text: `Hi ${opts.pharmacyName},\n\nYour PharmaConnect subscription payment of Rs. ${opts.amount} succeeded${opts.transactionId ? ` (txn ${opts.transactionId})` : ""}. Your subscription is now active.\n\n${baseUrl()}/dashboard/pharmacy\n\n— PharmaConnect`,
+    subject: `PharmaConnect ${opts.planLabel} active`,
+    text: `Hi ${opts.pharmacyName},\n\nYour ${opts.planLabel} payment of Rs. ${opts.amount} succeeded${opts.transactionId ? ` (txn ${opts.transactionId})` : ""}. The plan is active until ${validUntil}.\n\n${baseUrl()}/dashboard/pharmacy`,
     html: layout(
       "Payment receipt",
-      "Subscription activated",
-      `<p>Hi ${escapeHtml(opts.pharmacyName)},</p><p>Payment of <strong>Rs. ${opts.amount}</strong> succeeded${opts.transactionId ? ` (txn <code>${escapeHtml(opts.transactionId)}</code>)` : ""}. Your subscription is active — enjoy priority placement and the Verified fast-track queue.</p>${button(`${baseUrl()}/dashboard/pharmacy`, "Open dashboard")}`
+      `${opts.planLabel} active`,
+      `<p>Hi ${escapeHtml(opts.pharmacyName)},</p><p>Your <strong>${escapeHtml(opts.planLabel)}</strong> payment of <strong>Rs. ${opts.amount}</strong> succeeded${opts.transactionId ? ` (txn <code>${escapeHtml(opts.transactionId)}</code>)` : ""}. The plan is active until <strong>${validUntil}</strong>.</p>${button(`${baseUrl()}/dashboard/pharmacy`, "Open dashboard")}`
     ),
   };
 }

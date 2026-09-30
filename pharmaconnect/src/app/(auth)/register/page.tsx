@@ -70,32 +70,32 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-primary-50 dark:from-slate-950 dark:via-slate-900 dark:to-primary-950 py-12">
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center relative overflow-hidden py-12">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary-400/10 rounded-full blur-[150px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-400/10 rounded-full blur-[150px]" />
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary-400/15 rounded-full blur-[150px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-sky-400/10 rounded-full blur-[150px]" />
       </div>
 
       <div className="relative w-full max-w-lg mx-auto px-4 animate-fadeIn">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 text-white rounded-2xl shadow-lg shadow-primary-600/25 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-b from-primary-500 to-primary-600 text-white rounded-2xl shadow-[0_12px_32px_-8px_rgb(39_150_129/0.55)] ring-1 ring-inset ring-white/25 mb-4">
             <Stethoscope className="h-8 w-8" />
           </div>
-          <h1 className="text-3xl font-bold">{t("auth.registerTitle")}</h1>
-          <p className="text-slate-500 mt-1">{t("auth.registerSubtitle")}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("auth.registerTitle")}</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">{t("auth.registerSubtitle")}</p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800/90 backdrop-blur rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 p-8">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 text-center">{t("auth.iAm")}</p>
+        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-2xl shadow-card ring-1 ring-slate-200/80 dark:ring-slate-800 p-8">
+          <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 text-center">{t("auth.iAm")}</p>
           <div className="flex gap-3 mb-8">
             <button
               type="button"
               onClick={() => selectRole("PATIENT")}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold border-2 transition-all duration-200",
+                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold ring-1 ring-inset transition-all duration-200",
                 currentRole === "PATIENT"
-                  ? "bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-600/20"
-                  : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-primary-300 dark:hover:border-primary-700"
+                  ? "bg-slate-900 text-white ring-slate-900 dark:bg-white dark:text-slate-900 dark:ring-white shadow-md"
+                  : "ring-slate-200 dark:ring-slate-700 text-slate-600 dark:text-slate-400 hover:ring-primary-300 dark:hover:ring-primary-700 bg-white dark:bg-slate-900"
               )}
             >
               <UserRound className="h-5 w-5" />
@@ -105,10 +105,10 @@ export default function RegisterPage() {
               type="button"
               onClick={() => selectRole("PHARMACY")}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold border-2 transition-all duration-200",
+                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold ring-1 ring-inset transition-all duration-200",
                 currentRole === "PHARMACY"
-                  ? "bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-600/20"
-                  : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-primary-300 dark:hover:border-primary-700"
+                  ? "bg-slate-900 text-white ring-slate-900 dark:bg-white dark:text-slate-900 dark:ring-white shadow-md"
+                  : "ring-slate-200 dark:ring-slate-700 text-slate-600 dark:text-slate-400 hover:ring-primary-300 dark:hover:ring-primary-700 bg-white dark:bg-slate-900"
               )}
             >
               <Building2 className="h-5 w-5" />

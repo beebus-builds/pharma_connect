@@ -51,6 +51,16 @@ export async function POST(req: NextRequest) {
             latitude: data.latitude!,
             longitude: data.longitude!,
             licenseNumber: data.licenseNumber ?? null,
+            locations: {
+              create: {
+                name: "Main branch",
+                address: data.address!,
+                phone: data.phone!,
+                latitude: data.latitude!,
+                longitude: data.longitude!,
+                isPrimary: true,
+              },
+            },
           },
         } : undefined,
       },

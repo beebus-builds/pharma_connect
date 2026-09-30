@@ -1,8 +1,6 @@
 import type { MetadataRoute } from "next";
-import { getSiteUrl } from "@/lib/seo";
 
 export default function manifest(): MetadataRoute.Manifest {
-  const base = getSiteUrl();
   return {
     name: "PharmaConnect — Medicines Near You",
     short_name: "PharmaConnect",
@@ -26,6 +24,10 @@ export default function manifest(): MetadataRoute.Manifest {
       { name: "Medicine catalog", url: "/medicines", description: "Browse medicines and prices" },
       { name: "My requests", url: "/dashboard/patient", description: "Track your stock requests" },
     ],
-    ...(base ? { id: base } : {}),
+    // `id` must be same-origin as the document, otherwise Chrome ignores it
+    // (and logs "property 'id' ignored" once per installability check).
+    // A stable "/" works on localhost:3000, :3002, preview and prod alike —
+    // never put an absolute URL here.
+    id: "/",
   };
 }

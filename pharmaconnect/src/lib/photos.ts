@@ -27,7 +27,7 @@ export function validatePhotoFile(file: File): string | null {
   return null;
 }
 
-function safeFileName(kind: PhotoKind, mime: string): string {
+function safeFileName(kind: string, mime: string): string {
   const ext = EXT_BY_MIME[mime] ?? "jpg";
   const rand = crypto.randomBytes(8).toString("hex");
   return `${kind.toLowerCase()}-${Date.now()}-${rand}.${ext}`;
@@ -60,6 +60,27 @@ export async function savePharmacyPhoto(
   const buffer = Buffer.from(await file.arrayBuffer());
   await fs.writeFile(path.join(dir, fileName), buffer);
   return `/uploads/pharmacies/${pharmacyId}/${fileName}`;
+}
+
+/** Medicine catalog pack shot. Shared across pharmacies. */
+export async function saveMedicinePhoto(medicineId: string, file: File): Promise<string> {
+  const fileName = safeFileName("medicine", file.type);
+  const blobPath = `medicines/${medicineId}/${fileName}`;
+
+  if (isBlobConfigured()) {
+    const { put } = await import("@vercel/blob");
+    const blob = await put(blobPath, file, {
+      access: "public",
+      contentType: file.type,
+    });
+    return blob.url;
+  }
+
+  const dir = path.join(process.cwd(), "public", "uploads", "medicines", medicineId);
+  await fs.mkdir(dir, { recursive: true });
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(path.join(dir, fileName), buffer);
+  return `/uploads/medicines/${medicineId}/${fileName}`;
 }
 
 /** Best-effort delete of a previously stored photo. Never throws. */
