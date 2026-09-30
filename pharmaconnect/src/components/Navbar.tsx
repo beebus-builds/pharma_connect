@@ -56,7 +56,7 @@ export default function Navbar() {
   }, [mobileOpen]);
 
   const linkBase =
-    "flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30";
+    "flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg text-stone-600 dark:text-slate-300 hover:text-ink dark:hover:text-white hover:bg-stone-200/50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30";
 
   const navLinks = status === "authenticated" ? (
     <>
@@ -82,7 +82,7 @@ export default function Navbar() {
       </Link>
       <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
       <div className="flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-0 border-slate-100 dark:border-slate-800">
-        <Link href={dashboardHref} className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-b from-primary-500 to-primary-600 text-white text-xs font-bold shadow-md shadow-primary-600/25 hover:shadow-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 shrink-0 ring-1 ring-inset ring-white/25" title={session?.user.name ?? ""} aria-label="Go to dashboard">
+        <Link href={dashboardHref} className="flex items-center justify-center w-8 h-8 rounded-full bg-primary-700 text-white text-xs font-bold hover:bg-primary-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30 shrink-0" title={session?.user.name ?? ""} aria-label="Go to dashboard">
           {initials || "U"}
         </Link>
         <span className="text-sm font-medium truncate sm:hidden flex-1">{session?.user.name}</span>
@@ -107,7 +107,7 @@ export default function Navbar() {
       </Link>
       <Link
         href="/register"
-        className="text-sm font-semibold px-5 py-2.5 rounded-xl bg-gradient-to-b from-primary-500 to-primary-600 text-white hover:from-primary-600 hover:to-primary-700 shadow-[0_8px_24px_-8px_rgb(39_150_129/0.5)] hover:shadow-[0_12px_32px_-8px_rgb(39_150_129/0.55)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 ring-1 ring-inset ring-white/20"
+        className="text-sm font-semibold px-5 py-2.5 rounded-lg bg-primary-700 text-white hover:bg-primary-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30"
         onClick={() => setMobileOpen(false)}
       >
         {t("nav.signup")}
@@ -120,13 +120,13 @@ export default function Navbar() {
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 z-[60] bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
         {t("nav.skipToContent")}
       </a>
-      <header className="sticky top-0 z-50 border-b border-slate-200/70 dark:border-slate-800/70 glass">
+      <header className="sticky top-0 z-50 border-b border-stone-200 dark:border-slate-800 bg-paper/95 dark:bg-slate-950/95">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="group flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 rounded-xl">
-            <div className="p-2 bg-gradient-to-b from-primary-500 to-primary-600 text-white rounded-xl shadow-[0_8px_20px_-8px_rgb(39_150_129/0.6)] ring-1 ring-inset ring-white/25 group-hover:shadow-[0_10px_28px_-8px_rgb(39_150_129/0.65)] transition-shadow">
+          <Link href="/" className="group flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30 rounded-lg">
+            <div className="p-2 bg-primary-700 text-white rounded-lg">
               <Stethoscope className="h-5 w-5" />
             </div>
-            <span className="font-bold text-[1.15rem] tracking-tight text-slate-900 dark:text-white">Pharma<span className="text-gradient">Connect</span></span>
+            <span className="font-display font-semibold text-[1.2rem] text-ink dark:text-white">PharmaConnect</span>
           </Link>
 
           <div className="flex items-center gap-1">

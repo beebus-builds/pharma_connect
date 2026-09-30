@@ -51,7 +51,7 @@ export default function Footer() {
               <div className="p-2 bg-gradient-to-b from-primary-500 to-primary-600 text-white rounded-xl shadow-md ring-1 ring-inset ring-white/25">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
-              <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">Pharma<span className="text-gradient">Connect</span></span>
+              <span className="font-display font-semibold text-xl text-slate-900 dark:text-white">PharmaConnect</span>
             </Link>
             <p className="text-slate-500 dark:text-slate-400 max-w-sm leading-relaxed mb-7">
               {t("footer.tagline")}

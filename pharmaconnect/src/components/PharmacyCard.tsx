@@ -6,7 +6,6 @@ import { useSession } from "@/components/Providers";
 import { useRouter } from "next/navigation";
 import { appToast as toast } from "@/components/Providers";
 import { MapPin, Phone, Send, CheckCircle2, Clock, MessageCircle, PhoneCall, Flag, Store, ChevronDown, Facebook } from "lucide-react";
-import { Card } from "@/components/ui/Card";
 import { StockBadge, DistanceBadge, VerifiedBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -103,30 +102,29 @@ export default function PharmacyCard({
   }
 
   return (
-    <Card
+    <article
       className={cn(
-        "group p-5 hover:-translate-y-1 transition-all duration-300 overflow-hidden",
-        highlighted &&
-          "ring-2 ring-primary-500/40 shadow-glow -translate-y-1"
+        "group border-t rule py-5 first:border-t-0 first:pt-1 transition-colors",
+        highlighted && "bg-primary-50/60 dark:bg-primary-500/5 -mx-3 px-3 rounded-xl"
       )}
       data-pharmacy-card={pharmacy.id}
     >
-      {/* Header: badges + report */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      {/* Meta row */}
+      <div className="flex flex-wrap items-center gap-2 mb-2">
         <StockBadge status={pharmacy.stockStatus} />
         <DistanceBadge km={pharmacy.distanceKm} />
         {pharmacy.verified && <VerifiedBadge />}
         {pharmacy.sponsored && (
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sponsored</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-stone-400">Sponsored</span>
         )}
-        <span className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">
+        <span className="ml-auto flex items-center gap-1 text-[11px] tabular-nums text-stone-400">
           <Clock className="h-3 w-3" />
           {formatRelativeTime(pharmacy.stockUpdatedAt)}
         </span>
         <button
           type="button"
           onClick={openReport}
-          className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
+          className="p-1.5 rounded-md text-stone-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
           aria-label={t("card.reportAria", { name: pharmacy.name })}
           title={t("home.report")}
         >
@@ -134,14 +132,14 @@ export default function PharmacyCard({
         </button>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <Link
           href={
             userLocation
               ? `/pharmacies/${pharmacy.id}?lat=${userLocation.lat}&lng=${userLocation.lng}`
               : `/pharmacies/${pharmacy.id}`
           }
-          className="relative h-12 w-12 rounded-2xl overflow-hidden bg-gradient-to-b from-primary-50 to-primary-100/60 dark:from-primary-500/15 dark:to-primary-500/5 ring-1 ring-slate-200 dark:ring-slate-700 shrink-0 flex items-center justify-center hover:ring-2 hover:ring-primary-500/40 transition-shadow"
+          className="relative h-12 w-12 rounded-lg overflow-hidden bg-primary-50 dark:bg-primary-500/10 border border-stone-200 dark:border-slate-700 shrink-0 flex items-center justify-center"
           aria-label={t("card.storefrontAria", { name: pharmacy.name })}
           title={t("card.storefrontTitle")}
         >
@@ -156,65 +154,64 @@ export default function PharmacyCard({
               className="absolute inset-0 h-full w-full object-cover"
             />
           ) : (
-            <Store className="h-5 w-5 text-primary-600 dark:text-primary-400" aria-hidden="true" />
+            <Store className="h-5 w-5 text-primary-700 dark:text-primary-300" aria-hidden="true" />
           )}
         </Link>
         <div className="min-w-0 flex-1">
-          <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white line-clamp-1 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors">
+          <h3 className="font-display text-lg leading-snug text-ink dark:text-white line-clamp-1">
             <Link
               href={
                 userLocation
                   ? `/pharmacies/${pharmacy.id}?lat=${userLocation.lat}&lng=${userLocation.lng}`
                   : `/pharmacies/${pharmacy.id}`
               }
-              className="hover:underline underline-offset-2 decoration-primary-300"
+              className="hover:underline underline-offset-4 decoration-primary-300"
               title={t("card.storefrontTitle")}
             >
               {pharmacy.name}
             </Link>
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{pharmacy.branchName} · {pharmacy.address}</p>
+          <p className="text-[13px] text-stone-500 dark:text-slate-400 truncate">{pharmacy.branchName} · {pharmacy.address}</p>
         </div>
+        <p className="hidden sm:block text-sm font-semibold tabular-nums text-ink dark:text-white shrink-0">
+          {pharmacy.quantity} <span className="font-normal text-stone-500">{t("card.units")}</span>
+        </p>
       </div>
-      <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-2">
-        <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-        <a href={`tel:${pharmacy.phone}`} className="hover:text-primary-600 hover:underline underline-offset-2 font-medium">
-          {pharmacy.phone}
-        </a>
-      </p>
 
-      <div className="mt-3 flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 ring-1 ring-inset ring-slate-200/70 dark:ring-slate-700/70 p-2.5">
+      <div className="mt-3 flex items-center gap-3 pl-[3.75rem]">
         {pharmacy.medicine.imageUrl && !lite ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={pharmacy.medicine.imageUrl}
             alt={pharmacy.medicine.genericName}
-            className="h-11 w-11 rounded-xl object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700"
+            className="h-10 w-10 rounded-md object-cover shrink-0 border border-stone-200 dark:border-slate-700"
             loading="lazy"
           />
         ) : (
-          <span className="h-11 w-11 rounded-xl bg-white dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">
+          <span className="h-10 w-10 rounded-md bg-stone-100 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-stone-400 shrink-0">
             Rx
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+          <p className="text-sm font-semibold text-ink dark:text-white truncate">
             {pharmacy.medicine.genericName}
-            <span className="font-medium text-slate-500"> · {pharmacy.medicine.brandName}</span>
+            <span className="font-normal text-stone-500"> · {pharmacy.medicine.brandName} {pharmacy.medicine.strength}</span>
           </p>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            {pharmacy.quantity} {t("card.units")} {t("card.available")}
+          <p className="text-xs text-stone-500 dark:text-slate-400 tabular-nums">
+            <a href={`tel:${pharmacy.phone}`} className="hover:text-primary-700 hover:underline underline-offset-2 font-medium">
+              {pharmacy.phone}
+            </a>
             {pharmacy.mrp !== null && pharmacy.mrp !== undefined && (
-              <span className="font-bold text-emerald-600 dark:text-emerald-400"> · Rs. {pharmacy.mrp}</span>
+              <span className="font-semibold text-primary-800 dark:text-primary-300"> · Rs. {pharmacy.mrp}</span>
             )}
           </p>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className="mt-3 pl-[3.75rem] flex flex-wrap items-center gap-2">
         <a
           href={`tel:${pharmacy.phone}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-lg border border-stone-200 dark:border-slate-700 hover:border-stone-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30"
           aria-label={t("card.callAria", { name: pharmacy.name })}
         >
           <Phone className="h-3.5 w-3.5" />
@@ -224,8 +221,8 @@ export default function PharmacyCard({
           <Button
             variant={isSent ? "primary" : "secondary"}
             className={cn(
-              "text-xs px-4 py-2 min-w-[108px]",
-              isSent && "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
+              "text-xs px-4 py-2 min-w-[108px] rounded-lg",
+              isSent && "bg-primary-700 hover:bg-primary-800"
             )}
             loading={requesting}
             onClick={handleRequestClick}
@@ -250,15 +247,15 @@ export default function PharmacyCard({
           </Button>
         )}
         <details className="relative ml-auto">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 [&::-webkit-details-marker]:hidden">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold px-3.5 py-2 rounded-lg border border-stone-200 dark:border-slate-700 hover:border-stone-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30 [&::-webkit-details-marker]:hidden">
             {t("card.more")} <ChevronDown className="h-3.5 w-3.5" />
           </summary>
-          <div className="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1.5 shadow-xl">
+          <div className="absolute right-0 z-20 mt-2 w-44 rounded-lg border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1.5 shadow-card">
             <a
               href={`https://www.google.com/maps/?q=${pharmacy.latitude},${pharmacy.longitude}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
             >
               <MapPin className="h-3.5 w-3.5" /> {t("card.viewMap")}
             </a>
@@ -266,7 +263,7 @@ export default function PharmacyCard({
               href={`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.latitude},${pharmacy.longitude}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
             >
               <MapPin className="h-3.5 w-3.5" /> {t("card.directions")}
             </a>
@@ -275,7 +272,7 @@ export default function PharmacyCard({
                 href={waLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
               >
                 <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
               </a>
@@ -285,7 +282,7 @@ export default function PharmacyCard({
                 href={viberLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
               >
                 <PhoneCall className="h-3.5 w-3.5" /> Viber
               </a>
@@ -298,7 +295,7 @@ export default function PharmacyCard({
               )}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
             >
               <Facebook className="h-3.5 w-3.5 text-[#1877F2]" /> {t("card.share")}
             </a>
@@ -316,9 +313,9 @@ export default function PharmacyCard({
           <form
             onSubmit={submitReport}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl"
+            className="w-full max-w-sm rounded-xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 p-6 shadow-card"
           >
-            <h3 className="font-bold text-base mb-1">{t("report.title")}</h3>
+            <h3 className="font-display text-lg mb-1">{t("report.title")}</h3>
             <p className="text-xs text-slate-500 mb-4">{t("report.subtitle", { name: pharmacy.name })}</p>
             <label htmlFor={`report-reason-${pharmacy.id}`} className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
               {t("report.reasonLabel")}
@@ -356,6 +353,6 @@ export default function PharmacyCard({
           </form>
         </div>
       )}
-    </Card>
+    </article>
   );
 }

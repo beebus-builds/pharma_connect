@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Fraunces, Public_Sans } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import Navbar from "@/components/Navbar";
@@ -11,10 +11,16 @@ import { getSiteUrl } from "@/lib/seo";
 
 const siteUrl = getSiteUrl();
 
-const inter = Inter({
+const display = Fraunces({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-inter",
+  variable: "--font-display",
+});
+
+const sans = Public_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-sans",
 });
 
 export const metadata: Metadata = {
@@ -57,12 +63,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className={inter.variable}>
-      <body className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased font-sans tracking-[-0.011em] bg-premium">
-        <div aria-hidden="true" className="bg-scene" />
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className={`${display.variable} ${sans.variable}`}>
+      <body className="min-h-screen bg-paper dark:bg-slate-950 text-ink dark:text-slate-100 antialiased font-sans">
         <Providers>
           <Navbar />
-          <main id="main-content" className="relative min-h-[calc(100vh-64px)] focus:outline-none" tabIndex={-1}>
+          <main id="main-content" className="min-h-[calc(100vh-64px)] focus:outline-none" tabIndex={-1}>
             <PageWrapper>
               <ErrorBoundary>
                 {children}
