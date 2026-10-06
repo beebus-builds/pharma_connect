@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Loader2, Wifi, WifiOff } from "lucide-react";
+import { Send, Loader2, Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { useChatSocket } from "@/hooks/useChatSocket";
 import { useSession } from "@/components/Providers";
 import { Button } from "@/components/ui/Button";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 export default function ChatWindow({ requestId, conversationId }: { requestId?: string; conversationId?: string }) {
   const { data: session } = useSession();
-  const { messages, connected, typingUser, send, sendTyping, markRead } = useChatSocket(requestId, conversationId);
+  const { messages, connected, polling, typingUser, send, sendTyping, markRead } = useChatSocket(requestId, conversationId);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -60,6 +60,10 @@ export default function ChatWindow({ requestId, conversationId }: { requestId?: 
             {connected ? (
               <>
                 <Wifi className="h-3 w-3 text-emerald-500" /> Connected · realtime
+              </>
+            ) : polling ? (
+              <>
+                <RefreshCw className="h-3 w-3 text-slate-400" /> Live via auto-refresh · ~4s delay
               </>
             ) : (
               <>

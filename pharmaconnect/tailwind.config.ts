@@ -34,8 +34,13 @@ const config: Config = {
       boxShadow: {
         card: "0 1px 2px rgb(28 25 23 / 0.05)",
         "card-hover": "0 2px 8px rgb(28 25 23 / 0.08)",
+        popover: "0 12px 32px -12px rgb(28 25 23 / 0.25)",
+        overlay: "0 24px 64px -16px rgb(28 25 23 / 0.35)",
       },
       borderRadius: {
+        // System scale: prefer rounded-lg (0.5rem) for controls,
+        // rounded-xl (0.75rem) for inputs, rounded-2xl (1rem) for cards.
+        // xl2/xl3 kept for backwards-compat only — do not use in new code.
         xl2: "1rem",
         xl3: "1.25rem",
       },

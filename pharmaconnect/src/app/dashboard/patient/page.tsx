@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { appToast as toast } from "@/components/Providers";
-import { Clock, Search, Inbox, Filter, ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
+import { Clock, Search, Inbox, Filter, ChevronLeft, ChevronRight, MessageCircle, Bell, Plus, Trash2 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +18,91 @@ export default function PatientDashboard() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "AVAILABLE" | "UNAVAILABLE">("ALL");
   const [page, setPage] = useState(1);
+
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [reminderQuery, setReminderQuery] = useState("");
+  const [reminderResults, setReminderResults] = useState<any[]>([]);
+  const [reminderMedicine, setReminderMedicine] = useState<any | null>(null);
+  const [daysSupply, setDaysSupply] = useState(30);
+  const [leadDays, setLeadDays] = useState(3);
+  const [savingReminder, setSavingReminder] = useState(false);
+
+  useEffect(() => {
+    async function loadReminders() {
+      try {
+        const res = await fetch("/api/reminders");
+        const data = await res.json();
+        if (res.ok) setReminders(data.reminders ?? []);
+      } catch {
+        // surfaced silently; list just stays empty
+      }
+    }
+    loadReminders();
+  }, []);
+
+  useEffect(() => {
+    if (!reminderQuery.trim() || reminderMedicine) {
+      setReminderResults([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/medicines/search?q=${encodeURIComponent(reminderQuery)}&limit=5`);
+        const data = await res.json();
+        setReminderResults(res.ok ? data.medicines ?? [] : []);
+      } catch {
+        setReminderResults([]);
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [reminderQuery, reminderMedicine]);
+
+  async function addReminder() {
+    if (!reminderMedicine) {
+      toast.error("Pick a medicine first");
+      return;
+    }
+    setSavingReminder(true);
+    try {
+      const res = await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ medicineId: reminderMedicine.id, daysSupply, leadDays }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save reminder");
+      setReminders((prev) => {
+        const rest = prev.filter((r) => r.id !== data.reminder.id && r.medicineId !== data.reminder.medicineId);
+        return [...rest, data.reminder].sort((a, b) => new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime());
+      });
+      setReminderMedicine(null);
+      setReminderQuery("");
+      setDaysSupply(30);
+      setLeadDays(3);
+      toast.success("Reminder saved — we'll email you before it runs out");
+    } catch (e: any) {
+      toast.error(e.message || "Something went wrong");
+    } finally {
+      setSavingReminder(false);
+    }
+  }
+
+  async function toggleReminder(r: any) {
+    const res = await fetch(`/api/reminders/${r.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: !r.active }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setReminders((prev) => prev.map((x) => (x.id === r.id ? data.reminder : x)));
+    }
+  }
+
+  async function deleteReminder(id: string) {
+    const res = await fetch(`/api/reminders/${id}`, { method: "DELETE" });
+    if (res.ok) setReminders((prev) => prev.filter((r) => r.id !== id));
+  }
 
   useEffect(() => {
     async function load() {
@@ -81,6 +166,84 @@ export default function PatientDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Refill reminders */}
+      <Card className="p-5 mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-1.5 bg-primary-100 dark:bg-primary-900/40 text-primary-600 rounded-lg">
+            <Bell className="h-4 w-4" />
+          </div>
+          <h2 className="font-bold text-sm">Refill reminders</h2>
+          <span className="text-xs text-slate-400">{reminders.length} active course{reminders.length === 1 ? "" : "s"}</span>
+        </div>
+
+        {reminders.length > 0 && (
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800 mb-4">
+            {reminders.map((r) => (
+              <li key={r.id} className="py-2.5 flex items-center gap-3 text-sm">
+                <div className="flex-1 min-w-0">
+                  <p className={`font-semibold truncate ${r.active ? "" : "line-through text-slate-400"}`}>
+                    {r.medicine.genericName} <span className="text-xs font-normal text-slate-500">{r.medicine.brandName} {r.medicine.strength}</span>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {r.daysSupply}-day course · next due {new Date(r.nextDue).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · warns {r.leadDays}d before
+                  </p>
+                </div>
+                <button onClick={() => toggleReminder(r)} className="text-[11px] font-bold text-primary-600 hover:underline">
+                  {r.active ? "Pause" : "Resume"}
+                </button>
+                <button onClick={() => deleteReminder(r.id)} aria-label="Delete reminder" className="text-slate-400 hover:text-red-600">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="grid sm:grid-cols-[1fr_auto_auto_auto] gap-2 items-start">
+          <div className="relative">
+            <input
+              value={reminderMedicine ? `${reminderMedicine.genericName} (${reminderMedicine.brandName})` : reminderQuery}
+              onChange={(e) => { setReminderMedicine(null); setReminderQuery(e.target.value); }}
+              placeholder="Search a medicine…"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+            />
+            {reminderResults.length > 0 && (
+              <ul className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg overflow-hidden">
+                {reminderResults.map((m) => (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => { setReminderMedicine(m); setReminderResults([]); setReminderQuery(""); }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      {m.genericName} <span className="text-xs text-slate-500">{m.brandName} · {m.strength}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <input
+            type="number" min={1} max={365} value={daysSupply}
+            onChange={(e) => setDaysSupply(Number(e.target.value))}
+            aria-label="Days supply"
+            className="w-24 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+            title="Days supply per course"
+          />
+          <input
+            type="number" min={0} max={30} value={leadDays}
+            onChange={(e) => setLeadDays(Number(e.target.value))}
+            aria-label="Days of warning"
+            className="w-20 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+            title="Warn this many days before it runs out"
+          />
+          <Button onClick={addReminder} loading={savingReminder} className="text-xs rounded-xl">
+            <Plus className="h-4 w-4" /> Add
+          </Button>
+        </div>
+        <p className="text-[11px] text-slate-400 mt-2">Course length (days) and how early to warn you. We email one reminder per course, then restart the countdown.</p>
+      </Card>
 
       {/* Filters */}
       {!loading && requests.length > 0 && (

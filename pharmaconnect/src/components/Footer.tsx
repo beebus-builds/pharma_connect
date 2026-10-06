@@ -43,28 +43,33 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-white dark:bg-slate-950 border-t border-slate-200/80 dark:border-slate-800 pt-16 pb-10 transition-colors duration-300">
-      <div className="max-w-6xl mx-auto px-4">
+    <footer className="bg-white dark:bg-slate-950 border-t border-stone-200 dark:border-slate-800 pt-16 pb-10 transition-colors duration-300">
+      <div className="container-app">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-14">
           <div className="col-span-1 md:col-span-2">
-            <Link href="/" className="inline-flex items-center gap-2.5 mb-5 hover:opacity-90 transition-opacity">
-              <div className="p-2 bg-gradient-to-b from-primary-500 to-primary-600 text-white rounded-xl shadow-md ring-1 ring-inset ring-white/25">
+            <Link href="/" className="inline-flex items-center gap-2.5 mb-5 hover:opacity-90 transition-opacity rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30">
+              <div className="p-2 bg-primary-700 text-white rounded-xl shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
               <span className="font-display font-semibold text-xl text-slate-900 dark:text-white">PharmaConnect</span>
             </Link>
-            <p className="text-slate-500 dark:text-slate-400 max-w-sm leading-relaxed mb-7">
+            <p className="lede text-slate-500 dark:text-slate-400 max-w-sm mb-7">
               {t("footer.tagline")}
             </p>
-            <div className="flex gap-4">
+            <div className="flex gap-2">
               {[
-                { name: "Globe", icon: Globe },
-                { name: "MessageCircle", icon: MessageCircle },
-                { name: "PhoneCall", icon: PhoneCall },
-              ].map(({ name, icon: Icon }) => (
-                <div key={name} className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl cursor-pointer hover:bg-primary-600 hover:text-white transition-all duration-300 shadow-sm group">
-                  <Icon className="h-6 w-6 group-hover:scale-110 transition-transform" />
-                </div>
+                { name: "Website", icon: Globe, href: "/" },
+                { name: "Chat", icon: MessageCircle, href: "/chat" },
+                { name: "Contact", icon: PhoneCall, href: "mailto:support@pharmaconnect.com.np" },
+              ].map(({ name, icon: Icon, href }) => (
+                <a
+                  key={name}
+                  href={href}
+                  aria-label={name}
+                  className="p-3 bg-stone-100 dark:bg-slate-800 rounded-xl text-stone-500 dark:text-slate-300 hover:bg-primary-700 hover:text-white transition-colors duration-200 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30"
+                >
+                  <Icon className="h-5 w-5" />
+                </a>
               ))}
             </div>
           </div>
@@ -92,7 +97,7 @@ export default function Footer() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t("footer.emailPlaceholder")}
                   aria-label={t("footer.emailPlaceholder")}
-                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm shadow-sm focus:outline-none focus:ring-4 focus:ring-primary-500/15 focus:border-primary-500 transition-all"
                   required
                 />
               </div>
@@ -113,7 +118,7 @@ export default function Footer() {
           </div>
         </div>
         
-        <div className="border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
+        <div className="border-t border-stone-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
           <p>© {new Date().getFullYear()} PharmaConnect Nepal. Engineered for a healthier nation.</p>
           <div className="flex gap-6">
             <Link href="/privacy" className="hover:text-slate-600 transition-colors">{t("footer.privacy")}</Link>

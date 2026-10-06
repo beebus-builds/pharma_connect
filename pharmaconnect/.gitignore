@@ -9,3 +9,6 @@ dist
 tsconfig.tsbuildinfo
 # Local dev photo uploads (production uses Vercel Blob)
 /public/uploads/*
+
+.vercel
+.env*

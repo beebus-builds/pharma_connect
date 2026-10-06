@@ -232,7 +232,7 @@ export default function SearchBar({ onSelect, onClear, selected, initialQuery }:
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={t("search.placeholder")}
-          className="w-full pl-12 pr-12 py-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm shadow-sm focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all duration-200 placeholder:text-slate-400"
+          className="w-full pl-12 pr-12 py-4 rounded-2xl border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm shadow-sm focus:outline-none focus:ring-4 focus:ring-primary-500/15 focus:border-primary-500 transition-all duration-200 placeholder:text-slate-400"
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
@@ -263,7 +263,7 @@ export default function SearchBar({ onSelect, onClear, selected, initialQuery }:
 
         {open && (
           <div
-            className="absolute z-50 mt-2 w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl overflow-hidden max-h-[460px] flex flex-col animate-slideUp motion-reduce:animate-none"
+            className="absolute z-50 mt-2 w-full rounded-2xl border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-popover overflow-hidden max-h-[460px] flex flex-col animate-slideUp motion-reduce:animate-none"
             role="region"
             aria-label={t("search.suggestions")}
           >
@@ -312,7 +312,17 @@ export default function SearchBar({ onSelect, onClear, selected, initialQuery }:
                           : "hover:bg-slate-50 dark:hover:bg-slate-700/50"
                       )}
                     >
-                      <History className="h-4 w-4 text-slate-400 group-hover:text-primary-600 shrink-0" aria-hidden="true" />
+                      {m.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={m.imageUrl}
+                          alt={m.genericName}
+                          loading="lazy"
+                          className="h-9 w-9 rounded-lg object-cover shrink-0 ring-1 ring-stone-200 dark:ring-slate-700"
+                        />
+                      ) : (
+                        <History className="h-4 w-4 text-slate-400 group-hover:text-primary-600 shrink-0" aria-hidden="true" />
+                      )}
                       <span className="text-sm truncate">
                         <span className="font-medium">{m.genericName}</span>
                         <span className="text-slate-500 text-xs ml-1.5">{m.brandName} · {m.strength}</span>
@@ -339,24 +349,34 @@ export default function SearchBar({ onSelect, onClear, selected, initialQuery }:
                       onClick={() => handleSelect(m)}
                       onMouseEnter={() => setActiveIndex(idx)}
                       className={cn(
-                        "w-full text-left px-4 py-3 flex items-center justify-between transition-colors group focus-visible:outline-none",
+                        "w-full text-left px-4 py-3 flex items-center justify-between transition-colors group focus-visible:outline-none focus-visible:bg-primary-50 dark:focus-visible:bg-slate-800",
                         idx === activeIndex
-                          ? "bg-primary-50 dark:bg-slate-700"
-                          : "hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                          ? "bg-primary-50 dark:bg-slate-800"
+                          : "hover:bg-stone-50 dark:hover:bg-slate-800/60"
                       )}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className={cn(
-                            "p-1.5 rounded-lg shrink-0 transition-colors",
-                            idx === activeIndex
-                              ? "bg-white dark:bg-slate-600 text-primary-600"
-                              : "bg-slate-100 dark:bg-slate-700 text-slate-500 group-hover:bg-white"
-                          )}
-                          aria-hidden="true"
-                        >
-                          <Pill className="h-4 w-4" />
-                        </div>
+                        {m.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={m.imageUrl}
+                            alt={m.genericName}
+                            loading="lazy"
+                            className="h-9 w-9 rounded-lg object-cover shrink-0 ring-1 ring-stone-200 dark:ring-slate-700"
+                          />
+                        ) : (
+                          <div
+                            className={cn(
+                              "p-1.5 rounded-lg shrink-0 transition-colors",
+                              idx === activeIndex
+                                ? "bg-white dark:bg-slate-700 text-primary-600"
+                                : "bg-stone-100 dark:bg-slate-800 text-slate-500 group-hover:bg-white dark:group-hover:bg-slate-700"
+                            )}
+                            aria-hidden="true"
+                          >
+                            <Pill className="h-4 w-4" />
+                          </div>
+                        )}
                         <span className="text-sm truncate">
                           <span className="font-semibold text-slate-900 dark:text-white">
                             <Highlight text={m.genericName} query={query} />

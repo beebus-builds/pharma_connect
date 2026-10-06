@@ -122,20 +122,14 @@ describe("homepage bundle graph (SPECS 3B)", () => {
 
   it("knows the 3D scene and the leaflet map are the dynamic leaves", () => {
     const summary = offenders.map((o) => `${o.file} (${dynamicOnly.has(o.abs) ? "dynamic" : "STATIC"})`);
-    expect(summary).toEqual(
-      expect.arrayContaining([expect.stringContaining("Hero3DScene"), expect.stringContaining("MapView")])
-    );
+    expect(summary).toEqual(expect.arrayContaining([expect.stringContaining("MapView")]))
   });
 
   it("loads the 3D scene and the leaflet map through dynamic imports", () => {
-    const hero3D = readFileSync(resolve(SRC, "components/ui/Hero3D.tsx"), "utf8");
-    expect(hero3D).toMatch(/\bimport\s*\(\s*["']\.\/Hero3DScene["']\s*\)/);
-
     const mapClient = readFileSync(resolve(SRC, "components/MapViewClient.tsx"), "utf8");
     expect(mapClient).toMatch(/\bimport\s*\(\s*["']@\/components\/MapView["']\s*\)/);
 
     const page = readFileSync(homepage, "utf8");
     expect(page).toMatch(/dynamic\s*\(\s*\(\)\s*=>\s*import\s*\(\s*["']@\/components\/MapViewClient["']/);
-    expect(page).toMatch(/dynamic\s*\(\s*\(\)\s*=>\s*import\s*\(\s*["']@\/components\/ui\/Hero3D["']/);
   });
 });

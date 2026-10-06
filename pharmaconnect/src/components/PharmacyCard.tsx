@@ -104,7 +104,7 @@ export default function PharmacyCard({
   return (
     <article
       className={cn(
-        "group border-t rule py-5 first:border-t-0 first:pt-1 transition-colors",
+        "group border-t rule py-5 first:border-t-0 first:pt-1 transition-all duration-200 hover:bg-stone-50/60 dark:hover:bg-slate-800/30 motion-reduce:transition-none",
         highlighted && "bg-primary-50/60 dark:bg-primary-500/5 -mx-3 px-3 rounded-xl"
       )}
       data-pharmacy-card={pharmacy.id}
@@ -139,7 +139,7 @@ export default function PharmacyCard({
               ? `/pharmacies/${pharmacy.id}?lat=${userLocation.lat}&lng=${userLocation.lng}`
               : `/pharmacies/${pharmacy.id}`
           }
-          className="relative h-12 w-12 rounded-lg overflow-hidden bg-primary-50 dark:bg-primary-500/10 border border-stone-200 dark:border-slate-700 shrink-0 flex items-center justify-center"
+          className="relative h-12 w-12 rounded-xl overflow-hidden bg-primary-50 dark:bg-primary-500/10 border border-stone-200 dark:border-slate-700 shrink-0 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30"
           aria-label={t("card.storefrontAria", { name: pharmacy.name })}
           title={t("card.storefrontTitle")}
         >
@@ -157,150 +157,154 @@ export default function PharmacyCard({
             <Store className="h-5 w-5 text-primary-700 dark:text-primary-300" aria-hidden="true" />
           )}
         </Link>
-        <div className="min-w-0 flex-1">
-          <h3 className="font-display text-lg leading-snug text-ink dark:text-white line-clamp-1">
-            <Link
-              href={
-                userLocation
-                  ? `/pharmacies/${pharmacy.id}?lat=${userLocation.lat}&lng=${userLocation.lng}`
-                  : `/pharmacies/${pharmacy.id}`
-              }
-              className="hover:underline underline-offset-4 decoration-primary-300"
-              title={t("card.storefrontTitle")}
-            >
-              {pharmacy.name}
-            </Link>
-          </h3>
-          <p className="text-[13px] text-stone-500 dark:text-slate-400 truncate">{pharmacy.branchName} · {pharmacy.address}</p>
-        </div>
-        <p className="hidden sm:block text-sm font-semibold tabular-nums text-ink dark:text-white shrink-0">
-          {pharmacy.quantity} <span className="font-normal text-stone-500">{t("card.units")}</span>
-        </p>
-      </div>
-
-      <div className="mt-3 flex items-center gap-3 pl-[3.75rem]">
-        {pharmacy.medicine.imageUrl && !lite ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={pharmacy.medicine.imageUrl}
-            alt={pharmacy.medicine.genericName}
-            className="h-10 w-10 rounded-md object-cover shrink-0 border border-stone-200 dark:border-slate-700"
-            loading="lazy"
-          />
-        ) : (
-          <span className="h-10 w-10 rounded-md bg-stone-100 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-stone-400 shrink-0">
-            Rx
-          </span>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-ink dark:text-white truncate">
-            {pharmacy.medicine.genericName}
-            <span className="font-normal text-stone-500"> · {pharmacy.medicine.brandName} {pharmacy.medicine.strength}</span>
-          </p>
-          <p className="text-xs text-stone-500 dark:text-slate-400 tabular-nums">
-            <a href={`tel:${pharmacy.phone}`} className="hover:text-primary-700 hover:underline underline-offset-2 font-medium">
-              {pharmacy.phone}
-            </a>
-            {pharmacy.mrp !== null && pharmacy.mrp !== undefined && (
-              <span className="font-semibold text-primary-800 dark:text-primary-300"> · Rs. {pharmacy.mrp}</span>
-            )}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-3 pl-[3.75rem] flex flex-wrap items-center gap-2">
-        <a
-          href={`tel:${pharmacy.phone}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-lg border border-stone-200 dark:border-slate-700 hover:border-stone-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30"
-          aria-label={t("card.callAria", { name: pharmacy.name })}
-        >
-          <Phone className="h-3.5 w-3.5" />
-          {t("card.call")}
-        </a>
-        {canRequest && onRequest && (
-          <Button
-            variant={isSent ? "primary" : "secondary"}
-            className={cn(
-              "text-xs px-4 py-2 min-w-[108px] rounded-lg",
-              isSent && "bg-primary-700 hover:bg-primary-800"
-            )}
-            loading={requesting}
-            onClick={handleRequestClick}
-            disabled={isSent}
-            aria-label={
-              isSent
-                ? t("card.requestSent")
-                : t("card.requestAria", { medicine: pharmacy.medicine.genericName, name: pharmacy.name })
-            }
-          >
-            {isSent ? (
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {t("card.sent")}
-              </div>
-            ) : (
-              <>
-                <Send className="h-3.5 w-3.5" />
-                {t("home.request")}
-              </>
-            )}
-          </Button>
-        )}
-        <details className="relative ml-auto">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold px-3.5 py-2 rounded-lg border border-stone-200 dark:border-slate-700 hover:border-stone-300 dark:hover:border-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30 [&::-webkit-details-marker]:hidden">
-            {t("card.more")} <ChevronDown className="h-3.5 w-3.5" />
-          </summary>
-          <div className="absolute right-0 z-20 mt-2 w-44 rounded-lg border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1.5 shadow-card">
-            <a
-              href={`https://www.google.com/maps/?q=${pharmacy.latitude},${pharmacy.longitude}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
-            >
-              <MapPin className="h-3.5 w-3.5" /> {t("card.viewMap")}
-            </a>
-            <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.latitude},${pharmacy.longitude}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
-            >
-              <MapPin className="h-3.5 w-3.5" /> {t("card.directions")}
-            </a>
-            {waLink && (
-              <a
-                href={waLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
-              >
-                <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-              </a>
-            )}
-            {viberLink && (
-              <a
-                href={viberLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
-              >
-                <PhoneCall className="h-3.5 w-3.5" /> Viber
-              </a>
-            )}
-            <a
-              href={facebookShareUrl(
-                typeof window !== "undefined"
-                  ? `${window.location.origin}/pharmacies/${pharmacy.id}`
-                  : `/pharmacies/${pharmacy.id}`
-              )}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
-            >
-              <Facebook className="h-3.5 w-3.5 text-[#1877F2]" /> {t("card.share")}
-            </a>
+        <div className="min-w-0 flex-1 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-display text-lg leading-snug text-ink dark:text-white line-clamp-1">
+                <Link
+                  href={
+                    userLocation
+                      ? `/pharmacies/${pharmacy.id}?lat=${userLocation.lat}&lng=${userLocation.lng}`
+                      : `/pharmacies/${pharmacy.id}`
+                  }
+                  className="hover:underline underline-offset-4 decoration-primary-300 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30"
+                  title={t("card.storefrontTitle")}
+                >
+                  {pharmacy.name}
+                </Link>
+              </h3>
+              <p className="text-[13px] text-stone-500 dark:text-slate-400 truncate">{pharmacy.branchName} · {pharmacy.address}</p>
+            </div>
+            <p className="hidden sm:block text-sm font-semibold tabular-nums text-ink dark:text-white shrink-0">
+              {pharmacy.quantity} <span className="font-normal text-stone-500">{t("card.units")}</span>
+            </p>
           </div>
-        </details>
+
+          <div className="flex items-center gap-3">
+            {pharmacy.medicine.imageUrl && !lite ? (
+              <img
+                src={pharmacy.medicine.imageUrl}
+                alt={pharmacy.medicine.genericName}
+                className="h-10 w-10 rounded-lg object-cover shrink-0 border border-stone-200 dark:border-slate-700"
+                loading="lazy"
+              />
+            ) : (
+              <span className="h-10 w-10 rounded-lg bg-stone-100 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-stone-400 shrink-0">
+                Rx
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-ink dark:text-white truncate">
+                {pharmacy.medicine.genericName}
+                <span className="font-normal text-stone-500"> · {pharmacy.medicine.brandName} {pharmacy.medicine.strength}</span>
+              </p>
+              <p className="text-xs text-stone-500 dark:text-slate-400 tabular-nums">
+                <a href={`tel:${pharmacy.phone}`} className="hover:text-primary-700 hover:underline underline-offset-2 font-medium rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30">
+                  {pharmacy.phone}
+                </a>
+                {pharmacy.mrp !== null && pharmacy.mrp !== undefined && (
+                  <span className="font-bold text-primary-700 dark:text-primary-300 tabular-nums"> · Rs. {pharmacy.mrp}</span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={`tel:${pharmacy.phone}`}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-lg border border-stone-200 dark:border-slate-700 hover:border-stone-300 dark:hover:border-slate-600 hover:bg-stone-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30"
+              aria-label={t("card.callAria", { name: pharmacy.name })}
+            >
+              <Phone className="h-3.5 w-3.5" />
+              {t("card.call")}
+            </a>
+            {canRequest && onRequest && (
+              <Button
+                variant={isSent ? "primary" : "secondary"}
+                size="sm"
+                className={cn(
+                  "min-w-[108px]",
+                  isSent && "bg-primary-700 hover:bg-primary-800"
+                )}
+                loading={requesting}
+                onClick={handleRequestClick}
+                disabled={isSent}
+                aria-label={
+                  isSent
+                    ? t("card.requestSent")
+                    : t("card.requestAria", { medicine: pharmacy.medicine.genericName, name: pharmacy.name })
+                }
+              >
+                {isSent ? (
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {t("card.sent")}
+                  </div>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    {t("home.request")}
+                  </>
+                )}
+              </Button>
+            )}
+            <details className="relative ml-auto">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold px-3.5 py-2 rounded-lg border border-stone-200 dark:border-slate-700 hover:border-stone-300 dark:hover:border-slate-600 hover:bg-stone-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30 [&::-webkit-details-marker]:hidden">
+                {t("card.more")} <ChevronDown className="h-3.5 w-3.5" />
+              </summary>
+              <div className="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1.5 shadow-popover">
+                <a
+                  href={`https://www.google.com/maps/?q=${pharmacy.latitude},${pharmacy.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
+                >
+                  <MapPin className="h-3.5 w-3.5" /> {t("card.viewMap")}
+                </a>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.latitude},${pharmacy.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
+                >
+                  <MapPin className="h-3.5 w-3.5" /> {t("card.directions")}
+                </a>
+                {waLink && (
+                  <a
+                    href={waLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                  </a>
+                )}
+                {viberLink && (
+                  <a
+                    href={viberLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
+                  >
+                    <PhoneCall className="h-3.5 w-3.5" /> Viber
+                  </a>
+                )}
+                <a
+                  href={facebookShareUrl(
+                    typeof window !== "undefined"
+                      ? `${window.location.origin}/pharmacies/${pharmacy.id}`
+                      : `/pharmacies/${pharmacy.id}`
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-slate-800"
+                >
+                  <Facebook className="h-3.5 w-3.5 text-[#1877F2]" /> {t("card.share")}
+                </a>
+              </div>
+            </details>
+          </div>
+        </div>
       </div>
       {reportOpen && (
         <div
@@ -313,7 +317,7 @@ export default function PharmacyCard({
           <form
             onSubmit={submitReport}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 p-6 shadow-card"
+            className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 p-6 shadow-overlay"
           >
             <h3 className="font-display text-lg mb-1">{t("report.title")}</h3>
             <p className="text-xs text-slate-500 mb-4">{t("report.subtitle", { name: pharmacy.name })}</p>

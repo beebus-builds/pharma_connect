@@ -107,6 +107,9 @@ model Pharmacy {
   verified   Boolean   @default(false)
   verifiedAt DateTime?
 
+  /// Optional weekly hours, e.g. { "mon": "09:00-21:00", "sun": "closed" }.
+  openingHours Json?
+
   createdAt DateTime @default(now())
 
   @@index([latitude, longitude])
@@ -191,6 +194,8 @@ model Medicine {
   searchLogs   SearchLog[]
   reminders    Reminder[]
 
+  // Catalog upsert key for the additive seed (scripts/seed-catalog.ts).
+  @@unique([genericName, brandName, strength])
   @@index([genericName])
   @@index([brandName])
 }
@@ -287,6 +292,8 @@ model Reminder {
   medicineId     String
   medicine       Medicine  @relation(fields: [medicineId], references: [id], onDelete: Cascade)
   daysSupply     Int       @default(30)
+  /// Days before nextDue the patient hears about it.
+  leadDays       Int       @default(3)
   nextDue        DateTime
   active         Boolean   @default(true)
   /// Guards against re-emailing the same reminder on every cron tick.

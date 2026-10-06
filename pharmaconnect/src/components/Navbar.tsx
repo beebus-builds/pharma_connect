@@ -56,7 +56,7 @@ export default function Navbar() {
   }, [mobileOpen]);
 
   const linkBase =
-    "flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg text-stone-600 dark:text-slate-300 hover:text-ink dark:hover:text-white hover:bg-stone-200/50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30";
+    "flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-xl text-stone-600 dark:text-slate-300 hover:text-ink dark:hover:text-white hover:bg-stone-200/50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30";
 
   const navLinks = status === "authenticated" ? (
     <>
@@ -107,7 +107,7 @@ export default function Navbar() {
       </Link>
       <Link
         href="/register"
-        className="text-sm font-semibold px-5 py-2.5 rounded-lg bg-primary-700 text-white hover:bg-primary-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30"
+        className="text-sm font-semibold px-5 py-2.5 rounded-xl bg-primary-700 text-white hover:bg-primary-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30"
         onClick={() => setMobileOpen(false)}
       >
         {t("nav.signup")}
@@ -120,10 +120,10 @@ export default function Navbar() {
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 z-[60] bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
         {t("nav.skipToContent")}
       </a>
-      <header className="sticky top-0 z-50 border-b border-stone-200 dark:border-slate-800 bg-paper/95 dark:bg-slate-950/95">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="group flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30 rounded-lg">
-            <div className="p-2 bg-primary-700 text-white rounded-lg">
+      <header className="sticky top-0 z-50 border-b border-stone-200 dark:border-slate-800 bg-paper/90 dark:bg-slate-950/90 backdrop-blur-md">
+        <div className="container-app h-16 flex items-center justify-between !px-4">
+          <Link href="/" className="group flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30 rounded-xl">
+            <div className="p-2 bg-primary-700 text-white rounded-xl shadow-sm">
               <Stethoscope className="h-5 w-5" />
             </div>
             <span className="font-display font-semibold text-[1.2rem] text-ink dark:text-white">PharmaConnect</span>
@@ -132,28 +132,32 @@ export default function Navbar() {
           <div className="flex items-center gap-1">
             <LocaleToggle />
 
-            <button
-              onClick={() => setLiteMode(!lite)}
-              disabled={!liteReady}
-              aria-label={lite ? t("nav.liteModeOff") : t("nav.liteModeOn")}
-              aria-pressed={lite}
-              title={lite ? t("nav.liteModeOff") : t("nav.liteModeOn")}
-              className={`p-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 disabled:cursor-wait disabled:opacity-50 ${
-                lite
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                  : "hover:bg-slate-100 dark:hover:bg-slate-800"
-              }`}
-            >
-              <Leaf className="h-4 w-4" />
-            </button>
+            {/* Utility toggles only earn header space on desktop; on phones they
+                live in the mobile sheet so the logo + menu stay uncrowded. */}
+            <div className="hidden sm:flex items-center gap-1">
+              <button
+                onClick={() => setLiteMode(!lite)}
+                disabled={!liteReady}
+                aria-label={lite ? t("nav.liteModeOff") : t("nav.liteModeOn")}
+                aria-pressed={lite}
+                title={lite ? t("nav.liteModeOff") : t("nav.liteModeOn")}
+                className={`p-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 disabled:cursor-wait disabled:opacity-50 ${
+                  lite
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                    : "hover:bg-stone-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Leaf className="h-4 w-4" />
+              </button>
 
-            <button
-              onClick={toggleTheme}
-              aria-label={theme === "dark" ? t("nav.themeLight") : t("nav.themeDark")}
-              className="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
+              <button
+                onClick={toggleTheme}
+                aria-label={theme === "dark" ? t("nav.themeLight") : t("nav.themeDark")}
+                className="p-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
+              >
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            </div>
 
             <nav className="hidden sm:flex items-center gap-1" aria-label="Primary">
               {navLinks}
@@ -184,6 +188,27 @@ export default function Navbar() {
             >
               <div className="px-4 py-4 flex flex-col gap-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
                 {navLinks}
+
+                {/* Display controls duplicated here for phones, where the header
+                    hides them to protect the logo and menu button. */}
+                <div className="flex items-center gap-2 pt-3 mt-2 border-t border-stone-200 dark:border-slate-800 sm:hidden">
+                  <button
+                    onClick={() => setLiteMode(!lite)}
+                    disabled={!liteReady}
+                    aria-pressed={lite}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+                  >
+                    <Leaf className="h-4 w-4" />
+                    {lite ? t("nav.liteModeOff") : t("nav.liteModeOn")}
+                  </button>
+                  <button
+                    onClick={toggleTheme}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    {theme === "dark" ? t("nav.themeLight") : t("nav.themeDark")}
+                  </button>
+                </div>
               </div>
             </div>
           </>

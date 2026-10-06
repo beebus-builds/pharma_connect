@@ -15,14 +15,24 @@ import {
   SlidersHorizontal,
   List,
   Map as MapIcon,
+  Phone,
+  Siren,
+  ArrowDownUp,
+  BadgeCheck,
+  Clock,
+  Filter,
+  PackageCheck,
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import PharmacyCard from "@/components/PharmacyCard";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Chip, ChipGroup } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useLiteMode } from "@/hooks/useLiteMode";
+import { isOpenNow } from "@/lib/hours";
 import { useLocale } from "@/components/LocaleProvider";
 import type { MedicineDTO, NearbyPharmacyDTO } from "@/types";
 import Link from "next/link";
@@ -51,7 +61,12 @@ const HomePageContent = () => {
   const [activePharmacyId, setActivePharmacyId] = useState<string | null>(null);
   const pharmacyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { lite, ready: liteModeReady } = useLiteMode();
+  const [filterVerifiedOnly, setFilterVerifiedOnly] = useState(false);
+  const [filterInStockOnly, setFilterInStockOnly] = useState(false);
+  const [filterOpenNow, setFilterOpenNow] = useState(false);
+  const [sortBy, setSortBy] = useState<"nearest" | "cheapest">("nearest");
   const { t } = useLocale();
+  const [emergency, setEmergency] = useState(false);
   const tRef = useRef(t);
   useEffect(() => {
     tRef.current = t;
@@ -71,6 +86,22 @@ const HomePageContent = () => {
   const mapAvailable = liteModeReady && !lite;
   const activeView = lite ? "list" : activeTab;
   const listVisible = !mapAvailable || activeView === "list";
+
+  const visiblePharmacies = pharmacies
+    .filter((p) => {
+      if (filterVerifiedOnly && !p.verified) return false;
+      if (filterInStockOnly && p.stockStatus === "out-of-stock") return false;
+      if (filterOpenNow && !isOpenNow(p.openingHours)) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "cheapest") {
+        const am = a.mrp ?? Number.POSITIVE_INFINITY;
+        const bm = b.mrp ?? Number.POSITIVE_INFINITY;
+        if (am !== bm) return am - bm;
+      }
+      return a.distanceKm - b.distanceKm;
+    });
 
   // Scroll the corresponding list card into view when a pin is clicked on the map
   useEffect(() => {
@@ -201,28 +232,25 @@ const HomePageContent = () => {
     <div className="flex flex-col gap-14 sm:gap-20 pb-20 transition-colors duration-500">
       {/* 1. Hero — editorial, left-aligned */}
       <section className="relative border-b rule pt-10 sm:pt-16 pb-10 sm:pb-14 overflow-hidden">
-        <div className="relative z-10 max-w-6xl mx-auto px-4 grid gap-10 lg:grid-cols-[5fr_3fr] lg:items-start">
+        <div className="relative z-10 container-app grid gap-10 lg:grid-cols-[5fr_3fr] lg:items-start">
           <div>
           {session ? (
             <div className="space-y-5 max-w-2xl">
-              <p className="inline-flex items-center gap-2 text-[11px] font-bold tracking-[0.14em] uppercase text-primary-700 dark:text-primary-300">
-                <span className="w-6 h-px bg-primary-700 dark:bg-primary-300" aria-hidden="true" /> {t("home.welcomeBack")}
-              </p>
+              <p className="eyebrow">{t("home.welcomeBack")}</p>
               <h1 className="headline font-display text-4xl sm:text-5xl text-ink dark:text-white">Welcome back, {session.user.name?.split(" ")[0] || "Patient"}</h1>
               <p className="lede text-stone-600 dark:text-slate-300 text-base sm:text-lg max-w-[52ch]">{t("home.welcomeSubtitle")}</p>
               <div className="flex flex-wrap gap-3 pt-2">
                 <Link href={session.user.role === "PHARMACY" ? "/dashboard/pharmacy" : "/dashboard/patient"}>
-                  <Button className="rounded-lg px-6">{t("home.viewRequests")}</Button>
+                  <Button size="lg">{t("home.viewRequests")}</Button>
                 </Link>
                 <Link href="/how-it-works">
-                  <Button variant="secondary" className="rounded-lg">{t("home.howItWorks")}</Button>
+                  <Button variant="secondary" size="lg">{t("home.howItWorks")}</Button>
                 </Link>
               </div>
             </div>
           ) : (
             <div className="max-w-2xl">
-              <p className="inline-flex items-center gap-2 text-[11px] font-bold tracking-[0.14em] uppercase text-primary-700 dark:text-primary-300 mb-5">
-                <span className="w-6 h-px bg-primary-700 dark:bg-primary-300" aria-hidden="true" />
+              <p className="eyebrow mb-5">
                 Kathmandu · Lalitpur · Bhaktapur — live stock
               </p>
               <h1 className="headline font-display text-[2.75rem] sm:text-6xl text-ink dark:text-white">
@@ -235,7 +263,7 @@ const HomePageContent = () => {
           )}
 
           <div className="mt-8 max-w-2xl">
-            <div className="rounded-xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 p-2">
+            <div className="rounded-2xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 p-2 shadow-card transition-shadow focus-within:shadow-card-hover focus-within:ring-2 focus-within:ring-primary-600/20">
               <SearchBar
                 onSelect={setMedicine}
                 onClear={() => setMedicine(null)}
@@ -246,12 +274,12 @@ const HomePageContent = () => {
             {/* Location status */}
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
               {locLoading ? (
-                <span className="inline-flex items-center gap-2 text-stone-500 bg-white px-3 py-1.5 rounded-lg border border-stone-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700">
+                <span className="inline-flex items-center gap-2 text-stone-500 bg-white px-3 py-1.5 rounded-full border border-stone-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700">
                   <span className="w-3 h-3 border-2 border-stone-300 border-t-primary-700 rounded-full animate-spin" aria-hidden="true" />
                   {t("home.detectingLocation")}
                 </span>
               ) : location ? (
-                <span className="inline-flex items-center gap-2 text-primary-800 bg-primary-50 px-3 py-1.5 rounded-lg border border-primary-200 dark:bg-primary-500/10 dark:text-primary-300 dark:border-primary-400/20">
+                <span className="inline-flex items-center gap-2 text-primary-800 bg-primary-50 px-3 py-1.5 rounded-full border border-primary-200 dark:bg-primary-500/10 dark:text-primary-300 dark:border-primary-400/20">
                   <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
                   {location.lat.toFixed(3)}, {location.lng.toFixed(3)} · Within {radiusKm} km
                   <button onClick={requestLocation} className="ml-1 underline underline-offset-2 hover:opacity-80 transition-opacity">{t("home.updateLocation")}</button>
@@ -270,45 +298,56 @@ const HomePageContent = () => {
                 </button>
               )}
             </div>
-            {/* Radius chips - only show when medicine selected */}
+            {/* Search controls — one toolbar, one chip system */}
             {medicine && (
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-xs font-semibold text-stone-500 flex items-center gap-1">
-                  <SlidersHorizontal className="h-3 w-3" /> {t("home.radius")}:
-                </span>
-                <div className="flex gap-1.5" role="group" aria-label="Search radius">
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <ChipGroup label={t("home.radius")} icon={<SlidersHorizontal className="h-3 w-3" />}>
                   {[2, 5, 10, 20].map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => setRadiusKm(r)}
-                      aria-pressed={radiusKm === r}
-                      className={`px-3 py-1 rounded-md text-xs font-bold border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30 ${
-                        radiusKm === r
-                          ? "bg-ink text-white border-ink dark:bg-white dark:text-ink dark:border-white"
-                          : "bg-white text-stone-600 border-stone-200 hover:border-stone-300 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700"
-                      }`}
-                    >
+                    <Chip key={r} size="sm" selected={radiusKm === r} onClick={() => setRadiusKm(r)}>
                       {r} km
-                    </button>
+                    </Chip>
                   ))}
-                </div>
+                </ChipGroup>
+
+                {pharmacies.length > 0 && (
+                  <ChipGroup label={t("home.sort")} icon={<ArrowDownUp className="h-3 w-3" />}>
+                    {([["nearest", t("home.sortNearest")], ["cheapest", t("home.sortCheapest")]] as const).map(
+                      ([value, label]) => (
+                        <Chip key={value} size="sm" selected={sortBy === value} onClick={() => setSortBy(value)}>
+                          {label}
+                        </Chip>
+                      )
+                    )}
+                  </ChipGroup>
+                )}
+
+                <Chip
+                  tone="danger"
+                  size="sm"
+                  selected={emergency}
+                  onClick={() => setEmergency((v) => !v)}
+                  className="ml-auto"
+                >
+                  <Siren className="h-3.5 w-3.5" />
+                  {t("home.emergency")}
+                </Chip>
               </div>
             )}
           </div>
           </div>
 
           {/* Ledger — real numbers, how it works as numbered steps */}
-          <aside className="border border-stone-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 divide-y divide-stone-200/70 dark:divide-slate-800">
-            <div className="p-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500 dark:text-slate-400">Live ledger</p>
-              <dl className="mt-3 space-y-2">
-                <div className="flex items-baseline justify-between gap-4">
-                  <dt className="text-sm text-stone-600 dark:text-slate-300">Verified pharmacies</dt>
-                  <dd className="font-display text-2xl text-ink dark:text-white">{stats ? stats.verifiedPharmacies : "—"}</dd>
+          <aside className="surface divide-y divide-stone-200/70 dark:divide-slate-800 overflow-hidden">
+            <div className="p-5 bg-primary-50/50 dark:bg-slate-900/80">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary-700 dark:text-primary-300">Live network</p>
+              <dl className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <dd className="font-display text-3xl text-ink dark:text-white">{stats ? stats.verifiedPharmacies : "—"}</dd>
+                  <dt className="text-xs text-stone-500 dark:text-slate-400 mt-1">Verified pharmacies</dt>
                 </div>
-                <div className="flex items-baseline justify-between gap-4">
-                  <dt className="text-sm text-stone-600 dark:text-slate-300">Catalog entries</dt>
-                  <dd className="font-display text-2xl text-ink dark:text-white">{stats ? `${Math.round(stats.medicineCount / 100) / 10}k` : "—"}</dd>
+                <div>
+                  <dd className="font-display text-3xl text-ink dark:text-white">{stats ? `${Math.round(stats.medicineCount / 100) / 10}k` : "—"}</dd>
+                  <dt className="text-xs text-stone-500 dark:text-slate-400 mt-1">Catalog entries</dt>
                 </div>
               </dl>
             </div>
@@ -334,7 +373,7 @@ const HomePageContent = () => {
       {/* 3. Search Results */}
       <section
         id="pharmacies"
-        className="max-w-7xl mx-auto px-4 w-full scroll-mt-24"
+        className="container-wide scroll-mt-24"
         aria-live="polite"
         aria-busy={searching}
       >
@@ -355,9 +394,33 @@ const HomePageContent = () => {
                 {searching ? (
                   <span className="inline-flex items-center gap-2"><span className="w-3 h-3 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" /> {t("home.searchingWithin", { km: radiusKm })}</span>
                 ) : (
-                  <span>{t("home.foundCount", { count: pharmacies.length })}</span>
+                  <span>
+                    {t("home.foundCount", { count: visiblePharmacies.length })}
+                    {sortBy === "cheapest" && (
+                      <span className="font-semibold text-ink dark:text-white">
+                        {" · "}
+                        {t("home.sortCheapest")}
+                      </span>
+                    )}
+                  </span>
                 )}
               </p>
+            )}
+            {medicine && !searching && pharmacies.length > 0 && (
+              <ChipGroup label={t("home.filter")} className="mt-3" icon={<Filter className="h-3 w-3" />}>
+                <Chip tone="primary" size="sm" selected={filterVerifiedOnly} onClick={() => setFilterVerifiedOnly((v) => !v)}>
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                  {t("home.verifiedOnly")}
+                </Chip>
+                <Chip tone="primary" size="sm" selected={filterInStockOnly} onClick={() => setFilterInStockOnly((v) => !v)}>
+                  <PackageCheck className="h-3.5 w-3.5" />
+                  {t("home.inStockOnly")}
+                </Chip>
+                <Chip tone="primary" size="sm" selected={filterOpenNow} onClick={() => setFilterOpenNow((v) => !v)}>
+                  <Clock className="h-3.5 w-3.5" />
+                  {t("home.openNowOnly")}
+                </Chip>
+              </ChipGroup>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -385,40 +448,80 @@ const HomePageContent = () => {
 
             {!searching && medicine && pharmacies.length === 0 && (
               <div className="animate-fadeIn motion-reduce:animate-none">
-                <Card className="p-8 sm:p-10 text-center space-y-5 border-dashed border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-                  <div className="bg-slate-50 dark:bg-slate-800 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto">
-                    <ShieldAlert className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg sm:text-xl font-bold mb-2">{t("home.empty.title")}</h3>
-                    <p className="text-slate-500 text-sm leading-relaxed">{t("home.empty.body", { km: radiusKm })}</p>
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <div className="flex gap-1.5">
-                      {[5, 10, 20].map((r) => (
-                        <button key={r} onClick={() => setRadiusKm(r)} className={`px-3 py-1.5 rounded-full text-xs font-bold border ${radiusKm === r ? "bg-primary-600 text-white border-primary-600" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"}`}>{r} km</button>
-                      ))}
-                    </div>
-                  </div>
-                  <Link href="/how-it-works">
-                    <Button variant="outline" className="rounded-lg px-6">{t("home.empty.learnMore")}</Button>
-                  </Link>
-                </Card>
+                <EmptyState
+                  icon={ShieldAlert}
+                  title={t("home.empty.title")}
+                  body={t("home.empty.body", { km: radiusKm })}
+                  action={
+                    <>
+                      <ChipGroup label={t("home.radius")} icon={<SlidersHorizontal className="h-3 w-3" />}>
+                        {[5, 10, 20].map((r) => (
+                          <Chip key={r} selected={radiusKm === r} onClick={() => setRadiusKm(r)}>
+                            {r} km
+                          </Chip>
+                        ))}
+                      </ChipGroup>
+                      <Link href="/how-it-works">
+                        <Button variant="outline">{t("home.empty.learnMore")}</Button>
+                      </Link>
+                    </>
+                  }
+                />
               </div>
             )}
 
             {!searching && !medicine && pharmacies.length === 0 && (
-              <Card className="p-8 text-center bg-gradient-to-br from-primary-50 to-indigo-50 dark:from-slate-900 dark:to-slate-800 border-primary-100 dark:border-slate-700">
-                <Pill className="h-10 w-10 text-primary-600 mx-auto mb-3" aria-hidden="true" />
-                <h3 className="font-bold mb-1">{t("home.start.title")}</h3>
-                <p className="text-sm text-slate-500 mb-1">{t("home.start.body")}</p>
-                <p className="text-xs text-slate-400">{t("home.start.tip")}</p>
-              </Card>
+              <EmptyState
+                icon={Pill}
+                title={t("home.start.title")}
+                body={t("home.start.body")}
+                action={
+                  <>
+                    {["Paracetamol", "Amoxicillin", "Ibuprofen", "ORS"].map((name) => (
+                      <Link
+                        key={name}
+                        href={`/?q=${encodeURIComponent(name)}`}
+                        className="px-3 py-1.5 rounded-full border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold hover:border-primary-300 hover:text-primary-700 dark:hover:border-primary-500/40 dark:hover:text-primary-300 transition-colors"
+                      >
+                        {name}
+                      </Link>
+                    ))}
+                  </>
+                }
+              />
+            )}
+
+            {!searching && emergency && medicine && pharmacies.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-red-600">{t("home.emergencyTitle")}</p>
+                {[...visiblePharmacies]
+                  .sort((a, b) => a.distanceKm - b.distanceKm)
+                  .slice(0, 3)
+                  .map((p) => (
+                    <Card key={p.id} className="p-4 border-red-200 dark:border-red-900/40">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm truncate">{p.name}{p.branchName ? ` · ${p.branchName}` : ""}</p>
+                          <p className="text-xs text-slate-500 truncate">{p.address}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {p.distanceKm.toFixed(1)} km · {p.quantity} in stock{p.mrp !== null ? ` · Rs. ${p.mrp}` : ""}
+                          </p>
+                        </div>
+                        <a
+                          href={`tel:${p.phone.replace(/[^+\d]/g, "")}`}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold shrink-0"
+                        >
+                          <Phone className="h-4 w-4" /> Call
+                        </a>
+                      </div>
+                    </Card>
+                  ))}
+              </div>
             )}
 
             {!searching && (
               <div className={`space-y-3 sm:space-y-4 ${lite ? "overflow-visible" : "max-h-[70vh] lg:max-h-[600px] overflow-y-auto pr-1 -mr-1"}`}>
-                {pharmacies.map((p, i) => (
+                {(emergency && medicine ? [] : visiblePharmacies).map((p, i) => (
                   <div
                     key={p.id}
                     className={lite ? "" : "animate-slideUp motion-reduce:animate-none"}
@@ -458,7 +561,7 @@ const HomePageContent = () => {
           </div>
 
           {mapAvailable && (
-            <div className={`lg:col-span-7 h-[420px] sm:h-[520px] lg:h-[600px] lg:sticky lg:top-20 rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl relative ${activeView === "list" ? "hidden lg:block" : "block"}`}>
+            <div className={`lg:col-span-7 h-[420px] sm:h-[520px] lg:h-[600px] lg:sticky lg:top-20 rounded-2xl overflow-hidden border border-stone-200 dark:border-slate-800 shadow-card relative ${activeView === "list" ? "hidden lg:block" : "block"}`}>
               <MapViewClient
                 userLocation={location}
                 pharmacies={pharmacies}

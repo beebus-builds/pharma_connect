@@ -50,6 +50,8 @@ export interface NearbyPharmacyDTO {
   stockUpdatedAt: string | null;
   profileImageUrl: string | null;
   coverImageUrl: string | null;
+  /** Weekly hours, e.g. { mon: "09:00-21:00", sun: "closed" }. Null when unknown. */
+  openingHours: Record<string, string> | null;
   medicine: MedicineDTO;
 }
 

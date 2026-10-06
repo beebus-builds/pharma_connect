@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { MapPin, Phone, Navigation, Store, ArrowLeft } from "lucide-react";
+import { MapPin, Phone, Navigation, Store, ArrowLeft, PackageCheck } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { haversineDistanceKm, formatDistance, stockStatus } from "@/lib/utils";
@@ -12,6 +12,7 @@ import { effectiveThreshold, isExpired } from "@/lib/inventory";
 import { effectivePlan } from "@/lib/plans";
 import { viberUrl, whatsappUrl } from "@/lib/contact";
 import { VerifiedBadge } from "@/components/ui/Badge";
+import { StatTile } from "@/components/ui/StatTile";
 import ShareButtons from "@/components/ShareButtons";
 import StorefrontProducts from "./StorefrontProducts";
 import type { PharmacyStorefrontDTO } from "@/types";
@@ -167,33 +168,53 @@ export default async function PharmacyStorefrontPage({ params, searchParams }: P
           )}
         </div>
         <div className="min-w-0 flex-1 pt-1 sm:pb-1">
-          <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-2 flex-wrap">
+          <h1 className="headline font-display text-2xl sm:text-3xl flex items-center gap-2 flex-wrap">
             {storefront.name}
             {storefront.verified && <VerifiedBadge />}
           </h1>
-          <p className="text-sm text-slate-500 flex items-start gap-1.5 mt-1">
+          <p className="text-sm text-stone-500 dark:text-slate-400 flex items-start gap-1.5 mt-1.5">
             <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             {storefront.address}
             {storefront.distanceKm !== null && (
-              <span className="font-semibold text-primary-600 ml-1">· {formatDistance(storefront.distanceKm)} away</span>
+              <span className="font-semibold text-primary-700 dark:text-primary-300 ml-1">
+                · {formatDistance(storefront.distanceKm)} away
+              </span>
             )}
           </p>
         </div>
       </div>
 
-      {/* Actions */}
+      {/* At a glance — the three numbers a patient actually decides on */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 mt-6">
+        <StatTile
+          icon={PackageCheck}
+          label="In stock now"
+          value={storefront.inStockCount}
+          tone={storefront.inStockCount > 0 ? "positive" : "neutral"}
+        />
+        <StatTile icon={Store} label="Branches" value={storefront.branches.length} tone="neutral" />
+        <StatTile
+          icon={MapPin}
+          label={storefront.distanceKm !== null ? "Distance" : "Location"}
+          value={storefront.distanceKm !== null ? `${storefront.distanceKm.toFixed(1)}` : "—"}
+          caption={storefront.distanceKm !== null ? "km from you" : "Exact pin on map"}
+          tone="neutral"
+        />
+      </div>
+
+      {/* Actions — Call is the primary intent on a storefront */}
       <div className="flex flex-wrap gap-2 mt-5">
         <a
           href={`tel:${storefront.phone}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:opacity-90"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl bg-primary-700 hover:bg-primary-800 text-white shadow-sm transition-colors"
         >
-          <Phone className="h-3.5 w-3.5" /> {storefront.phone}
+          <Phone className="h-3.5 w-3.5" /> Call {storefront.phone}
         </a>
         <a
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl bg-white hover:bg-stone-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-stone-200 dark:border-slate-700 transition-colors"
         >
           <Navigation className="h-3.5 w-3.5" /> Directions
         </a>
@@ -202,7 +223,7 @@ export default async function PharmacyStorefrontPage({ params, searchParams }: P
             href={waLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl bg-white hover:bg-stone-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-stone-200 dark:border-slate-700 transition-colors"
           >
             WhatsApp
           </a>
@@ -212,7 +233,7 @@ export default async function PharmacyStorefrontPage({ params, searchParams }: P
             href={viberUrl(storefront.phone)!}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl bg-white hover:bg-stone-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-stone-200 dark:border-slate-700 transition-colors"
           >
             Viber
           </a>

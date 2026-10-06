@@ -83,6 +83,27 @@ export async function saveMedicinePhoto(medicineId: string, file: File): Promise
   return `/uploads/medicines/${medicineId}/${fileName}`;
 }
 
+/** Prescription scan attached to a request. Held for admin review before release. */
+export async function savePrescriptionPhoto(requestId: string, file: File): Promise<string> {
+  const fileName = safeFileName("prescription", file.type);
+  const blobPath = `prescriptions/${requestId}/${fileName}`;
+
+  if (isBlobConfigured()) {
+    const { put } = await import("@vercel/blob");
+    const blob = await put(blobPath, file, {
+      access: "public",
+      contentType: file.type,
+    });
+    return blob.url;
+  }
+
+  const dir = path.join(process.cwd(), "public", "uploads", "prescriptions", requestId);
+  await fs.mkdir(dir, { recursive: true });
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(path.join(dir, fileName), buffer);
+  return `/uploads/prescriptions/${requestId}/${fileName}`;
+}
+
 /** Best-effort delete of a previously stored photo. Never throws. */
 export async function deleteStoredPhoto(url: string): Promise<void> {
   try {

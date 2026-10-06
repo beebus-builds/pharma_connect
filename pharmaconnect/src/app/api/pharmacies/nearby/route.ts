@@ -54,6 +54,7 @@ type PostgisRow = {
   name: string;
   phone: string;
   verified: boolean;
+  openingHours: Record<string, string> | null;
   plan: string;
   planExpiresAt: Date | null;
   planRank: number | string | null;
@@ -168,6 +169,7 @@ async function queryPostgis(
         p."name" AS "name",
         p."phone" AS "phone",
         p."verified" AS "verified",
+        p."openingHours" AS "openingHours",
         p."plan" AS "plan",
         p."planExpiresAt" AS "planExpiresAt",
         m."id" AS "medicineId",
@@ -252,6 +254,7 @@ async function queryPostgis(
       latitude: Number(row.branchLat),
       longitude: Number(row.branchLng),
       verified: row.verified,
+      openingHours: (row.openingHours as Record<string, string> | null) ?? null,
       plan: rank === 2 ? "FEATURED" : rank === 1 ? "VERIFIED" : "FREE",
       sponsored: rank === 2,
       distanceKm,
@@ -319,6 +322,7 @@ async function queryBoundingBox(
         latitude: stock.location.latitude,
         longitude: stock.location.longitude,
         verified: pharmacy.verified,
+        openingHours: (pharmacy.openingHours as Record<string, string> | null) ?? null,
         plan,
         sponsored: rank === 2,
         distanceKm,

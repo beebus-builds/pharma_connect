@@ -209,6 +209,25 @@ export function lowStockAlertEmail(opts: {
   };
 }
 
+export function refillReminderEmail(opts: {
+  patientName: string;
+  medicineLabel: string;
+  daysLeft: number;
+}) {
+  const dueLabel = opts.daysLeft <= 0 ? "today" : `in ${opts.daysLeft} day${opts.daysLeft === 1 ? "" : "s"}`;
+  const safeName = escapeHtml(opts.patientName || "there");
+  const safeLabel = escapeHtml(opts.medicineLabel);
+  return {
+    subject: `Refill soon: ${opts.medicineLabel}`,
+    text: `Hi ${opts.patientName || "there"},\n\nYour ${opts.medicineLabel} course is expected to run out ${dueLabel}. Reorder early to avoid a gap — search nearby pharmacies that have it in stock.\n\n${baseUrl()}/?q=${encodeURIComponent(opts.medicineLabel)}\n\n— PharmaConnect`,
+    html: layout(
+      "Refill reminder",
+      `Time to refill: ${safeLabel}`,
+      `<p>Hi ${safeName},</p><p>Your <strong>${safeLabel}</strong> course is expected to run out <strong>${escapeHtml(dueLabel)}</strong>. Reorder early to avoid a gap.</p>${button(`${baseUrl()}/?q=${encodeURIComponent(opts.medicineLabel)}`, "Find it nearby")}`
+    ),
+  };
+}
+
 export function subscriptionReceiptEmail(opts: {
   pharmacyName: string;
   amount: number;

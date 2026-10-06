@@ -6,6 +6,9 @@ import { useSession } from "@/components/Providers";
 
 const REALTIME_URL = process.env.NEXT_PUBLIC_REALTIME_URL || "http://localhost:3001";
 
+/** Polling cadence when no websocket is available. */
+const POLL_INTERVAL_MS = 4000;
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -23,6 +26,8 @@ export function useChatSocket(requestId?: string, conversationId?: string) {
   const [connected, setConnected] = useState(false);
   const [typingUser, setTypingUser] = useState<string | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(conversationId || null);
+  /** True when the socket could not be used and HTTP polling is carrying the thread. */
+  const [polling, setPolling] = useState(false);
 
   const getToken = useCallback(async () => {
     // Use NextAuth session token via API - simplest: fetch /api/auth/token
@@ -35,6 +40,66 @@ export function useChatSocket(requestId?: string, conversationId?: string) {
     } catch {}
     return null;
   }, []);
+
+  /** Merges a server page of messages into state, newest last, de-duplicated by id. */
+  const merge = useCallback((incoming: ChatMessage[]) => {
+    setMessages((prev) => {
+      const seen = new Set(prev.map((m) => m.id));
+      const added = incoming.filter((m) => !seen.has(m.id));
+      if (added.length === 0) return prev;
+      return [...prev, ...added].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+    });
+  }, []);
+
+  const fetchViaHttp = useCallback(
+    async (since?: string) => {
+      if (!requestId) return [] as ChatMessage[];
+      const params = new URLSearchParams({ limit: "50" });
+      const res = await fetch(`/api/requests/${requestId}/messages?${params.toString()}`);
+      if (!res.ok) return [] as ChatMessage[];
+      const data = await res.json();
+      return (data.messages ?? []) as ChatMessage[];
+    },
+    [requestId]
+  );
+
+  // HTTP polling: loads history immediately, then re-polls until a socket wins.
+  // This is what keeps chat usable when the realtime service is not deployed.
+  useEffect(() => {
+    if (!session || !requestId) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let knownIds = new Set<string>();
+
+    async function poll() {
+      if (cancelled) return;
+      try {
+        const batch = await fetchViaHttp();
+        if (cancelled) return;
+        if (!socketRef.current?.connected) {
+          // First pass seeds the thread; later passes only append what is new.
+          const fresh = knownIds.size === 0 ? batch : batch.filter((m) => !knownIds.has(m.id));
+          knownIds = new Set(batch.map((m) => m.id));
+          merge(batch);
+          if (fresh.length > 0) setConnected(true);
+        }
+      } catch {
+        // Network hiccup: retry on the next tick.
+      }
+      if (!cancelled) timer = setTimeout(poll, POLL_INTERVAL_MS);
+    }
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      setPolling(false);
+    };
+  }, [session, requestId, fetchViaHttp, merge]);
 
   useEffect(() => {
     if (!session || (!requestId && !conversationId)) return;
@@ -52,14 +117,25 @@ export function useChatSocket(requestId?: string, conversationId?: string) {
         reconnection: true,
         reconnectionAttempts: 10,
         reconnectionDelay: 1000,
+        // Don't queue sends while the socket is down; HTTP fallback handles them.
+        timeout: 4000,
       });
       socketRef.current = socket;
 
       socket.on("connect", () => {
         setConnected(true);
+        setPolling(false);
         socket!.emit("join", { requestId, conversationId });
       });
-      socket.on("disconnect", () => setConnected(false));
+      socket.on("connect_error", () => {
+        // Realtime service unreachable — polling already seeded the thread.
+        setConnected(false);
+        setPolling(true);
+      });
+      socket.on("disconnect", () => {
+        setConnected(false);
+        setPolling(true);
+      });
       socket.on("joined", ({ conversationId: cid }: { conversationId: string }) => {
         setActiveConversationId(cid);
       });
@@ -67,10 +143,7 @@ export function useChatSocket(requestId?: string, conversationId?: string) {
         setMessages(msgs);
       });
       socket.on("new_message", (msg: ChatMessage) => {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
+        merge([msg]);
       });
       socket.on("typing", ({ name, isTyping }: { name: string; isTyping: boolean }) => {
         setTypingUser(isTyping ? name : null);
@@ -92,7 +165,7 @@ export function useChatSocket(requestId?: string, conversationId?: string) {
       socketRef.current = null;
       setConnected(false);
     };
-  }, [session, requestId, conversationId, getToken]);
+  }, [session, requestId, conversationId, getToken, merge]);
 
   const sendViaHttp = useCallback(
     async (content: string) => {
@@ -105,9 +178,11 @@ export function useChatSocket(requestId?: string, conversationId?: string) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send");
-      return data.message as ChatMessage;
+      const message = data.message as ChatMessage;
+      merge([message]);
+      return message;
     },
-    [requestId]
+    [requestId, merge]
   );
 
   const send = useCallback(
@@ -140,5 +215,5 @@ export function useChatSocket(requestId?: string, conversationId?: string) {
     socketRef.current.emit("mark_read", { conversationId: activeConversationId });
   }, [activeConversationId]);
 
-  return { messages, connected, typingUser, send, sendTyping, markRead, conversationId: activeConversationId, socket: socketRef.current };
+  return { messages, connected, polling, typingUser, send, sendTyping, markRead, conversationId: activeConversationId, socket: socketRef.current };
 }

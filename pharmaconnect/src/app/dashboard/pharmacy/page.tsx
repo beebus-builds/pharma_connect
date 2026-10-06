@@ -14,7 +14,10 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { StockBadge, StatusBadge } from "@/components/ui/Badge";
-import { ListSkeleton } from "@/components/ui/Skeleton";
+import { ListSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
+import { Tabs, Tab } from "@/components/ui/Tabs";
+import { StatTile } from "@/components/ui/StatTile";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { stockUpsertSchema, medicineCreateSchema, type StockUpsertInput, type MedicineCreateInput } from "@/lib/validations";
 import { effectiveThreshold, formatExpiry, isExpired, isExpiringSoon, DEFAULT_LOW_STOCK_THRESHOLD } from "@/lib/inventory";
 import { stockStatus } from "@/lib/utils";
@@ -65,6 +68,12 @@ function PharmacyDashboardContent() {
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [selectedMedicine, setSelectedMedicine] = useState<MedicineDTO | null>(null);
   const [tab, setTab] = useState<"stock" | "requests" | "photos" | "history">("stock");
+  // History is fetched on entry, so selection routes through here rather than
+  // repeating the guard inside every Tab onClick.
+  function selectTab(next: string) {
+    if (next === "history") void loadHistory();
+    setTab(next as typeof tab);
+  }
   const [inventoryQuery, setInventoryQuery] = useState("");
   const [qty, setQty] = useState<number>(10);
   const [history, setHistory] = useState<HistoryRow[]>([]);
@@ -370,12 +379,12 @@ function PharmacyDashboardContent() {
     <div className="max-w-5xl mx-auto px-4 py-10 animate-fadeIn">
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-widest text-primary-600 dark:text-primary-400 mb-1">Pharmacy console</p>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Pharmacy Dashboard</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Inventory and realtime patient chats</p>
+          <p className="eyebrow mb-2">Pharmacy console</p>
+          <h1 className="headline font-display text-3xl text-ink dark:text-white">Pharmacy Dashboard</h1>
+          <p className="text-stone-500 dark:text-slate-400 mt-1.5">Inventory and patient conversations</p>
         </div>
         <a href="/chat" className="self-start sm:self-auto">
-          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-sm font-semibold hover:opacity-90 transition-opacity">
+          <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold transition-colors">
             <MessageCircle className="h-4 w-4" /> Messages
           </span>
         </a>
@@ -389,35 +398,16 @@ function PharmacyDashboardContent() {
         />
       )}
 
-      {/* Stock Health Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <Card className="p-4 flex items-center gap-4 border-l-4 border-l-emerald-500">
-          <div className="p-2 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 rounded-lg">
-            <PackageCheck className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-slate-500 uppercase">Healthy Stock</p>
-            <p className="text-xl font-bold">{stocks.length - lowStockCount - outOfStockCount}</p>
-          </div>
-        </Card>
-        <Card className="p-4 flex items-center gap-4 border-l-4 border-l-amber-500">
-          <div className="p-2 bg-amber-100 dark:bg-amber-900/40 text-amber-600 rounded-lg">
-            <AlertTriangle className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-slate-500 uppercase">Low Stock</p>
-            <p className="text-xl font-bold">{lowStockCount}</p>
-          </div>
-        </Card>
-        <Card className="p-4 flex items-center gap-4 border-l-4 border-l-red-500">
-          <div className="p-2 bg-red-100 dark:bg-red-900/40 text-red-600 rounded-lg">
-            <XCircle className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-slate-500 uppercase">Out of Stock</p>
-            <p className="text-xl font-bold">{outOfStockCount}</p>
-          </div>
-        </Card>
+      {/* Stock Health Overview — clicking a tile scrolls to the matching filter view */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-8">
+        <StatTile
+          icon={PackageCheck}
+          label="Healthy"
+          value={stocks.length - lowStockCount - outOfStockCount}
+          tone="positive"
+        />
+        <StatTile icon={AlertTriangle} label="Low stock" value={lowStockCount} tone="warning" />
+        <StatTile icon={XCircle} label="Out of stock" value={outOfStockCount} tone="critical" />
       </div>
 
       {(expiredCount > 0 || expiringSoonCount > 0) && (
@@ -437,61 +427,27 @@ function PharmacyDashboardContent() {
         </Card>
       )}
 
-      <div className="flex gap-1 mb-8 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
-        <button
-          onClick={() => setTab("stock")}
-          className={cn(
-            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all",
-            tab === "stock"
-              ? "bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm"
-              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-          )}
-        >
-          <Pill className="h-4 w-4" />
+      <Tabs value={tab} onChange={selectTab} label="Dashboard sections" className="mb-8">
+        <Tab value="stock" active={tab === "stock"} onSelect={selectTab} icon={<Pill className="h-4 w-4" />}>
           Stock
-        </button>
-        <button
-          onClick={() => setTab("requests")}
-          className={cn(
-            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all",
-            tab === "requests"
-              ? "bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm"
-              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-          )}
+        </Tab>
+        <Tab
+          value="requests"
+          active={tab === "requests"}
+          onSelect={selectTab}
+          icon={<ClipboardList className="h-4 w-4" />}
+          count={pendingCount}
+          tone="alert"
         >
-          <ClipboardList className="h-4 w-4" />
           Requests
-          {pendingCount > 0 && (
-            <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-              {pendingCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setTab("photos")}
-          className={cn(
-            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all",
-            tab === "photos"
-              ? "bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm"
-              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-          )}
-        >
-          <ImagePlus className="h-4 w-4" />
+        </Tab>
+        <Tab value="photos" active={tab === "photos"} onSelect={selectTab} icon={<ImagePlus className="h-4 w-4" />}>
           Photos
-        </button>
-        <button
-          onClick={() => { setTab("history"); loadHistory(); }}
-          className={cn(
-            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all",
-            tab === "history"
-              ? "bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm"
-              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-          )}
-        >
-          <TrendingUp className="h-4 w-4" />
+        </Tab>
+        <Tab value="history" active={tab === "history"} onSelect={selectTab} icon={<TrendingUp className="h-4 w-4" />}>
           History
-        </button>
-      </div>
+        </Tab>
+      </Tabs>
 
       {tab === "photos" && <PhotoManager />}
 
@@ -503,12 +459,13 @@ function PharmacyDashboardContent() {
               Refresh
             </Button>
           </div>
-          {loadingHistory && <ListSkeleton count={4} />}
+          {loadingHistory && <CardSkeleton count={4} />}
           {!loadingHistory && history.length === 0 && (
-            <Card className="p-10 text-center border-dashed border-2 border-slate-200 dark:border-slate-700">
-              <TrendingUp className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 text-sm">No changes yet — every add, update, import and removal is logged here.</p>
-            </Card>
+            <EmptyState
+              icon={TrendingUp}
+              title="No stock changes yet"
+              body="Every add, update, import and removal is logged here as you work."
+            />
           )}
           {!loadingHistory && history.length > 0 && (
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
@@ -786,13 +743,13 @@ function PharmacyDashboardContent() {
                 </div>
               )}
             </div>
-            {loadingStocks && <ListSkeleton count={4} />}
+            {loadingStocks && <CardSkeleton count={4} />}
             {!loadingStocks && stocks.length === 0 && (
-              <Card className="p-10 text-center border-dashed border-2 border-slate-200 dark:border-slate-700">
-                <Pill className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 text-sm">No medicines in your inventory yet.</p>
-                <p className="text-xs text-slate-400 mt-1">Use the form to add your first item.</p>
-              </Card>
+              <EmptyState
+                icon={Pill}
+                title="No medicines in your inventory yet"
+                body="Use the form to add your first item, or import a CSV from Export."
+              />
             )}
             {!loadingStocks && stocks.length > 0 && (() => {
               const filtered = stocks.filter((r) =>
@@ -802,11 +759,16 @@ function PharmacyDashboardContent() {
               );
               if (filtered.length === 0) {
                 return (
-                  <Card className="p-8 text-center">
-                    <Search className="h-8 w-8 text-slate-300 mx-auto mb-2" aria-hidden="true" />
-                    <p className="text-sm text-slate-500">No matches for “{inventoryQuery}”</p>
-                    <button onClick={() => setInventoryQuery("")} className="text-xs font-semibold text-primary-600 hover:underline mt-1">Clear filter</button>
-                  </Card>
+                  <EmptyState
+                    icon={Search}
+                    title="No matches"
+                    body={`Nothing in your inventory matches “${inventoryQuery}”.`}
+                    action={
+                      <Button variant="outline" size="sm" onClick={() => setInventoryQuery("")}>
+                        Clear filter
+                      </Button>
+                    }
+                  />
                 );
               }
               return (
@@ -1014,13 +976,13 @@ function PharmacyDashboardContent() {
 
       {tab === "requests" && (
         <div>
-          {loadingRequests && <ListSkeleton count={3} />}
+          {loadingRequests && <CardSkeleton count={3} />}
           {!loadingRequests && requests.length === 0 && (
-            <Card className="p-10 text-center border-dashed border-2 border-slate-200 dark:border-slate-700">
-              <ClipboardList className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 text-sm">No patient requests yet.</p>
-              <p className="text-xs text-slate-400 mt-1">Requests will appear here when patients reach out.</p>
-            </Card>
+            <EmptyState
+              icon={ClipboardList}
+              title="No patient requests yet"
+              body="Requests appear here the moment a patient asks you for a medicine. Keeping stock accurate means more of them find you first."
+            />
           )}
           {!loadingRequests && requests.length > 0 && (
             <div className="space-y-3">
