@@ -4,7 +4,18 @@ import { getSiteUrl, slugifyGeneric } from "@/lib/seo";
 
 export const revalidate = 3600;
 
-const STATIC_ROUTES = ["", "/medicines", "/how-it-works", "/privacy", "/terms"];
+const STATIC_ROUTES = [
+  "",
+  "/medicines",
+  "/how-it-works",
+  "/about",
+  "/contact",
+  "/for-pharmacies",
+  "/pricing",
+  "/safety",
+  "/privacy",
+  "/terms",
+];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = getSiteUrl();

@@ -1,74 +1,112 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "@/components/Providers";
 import Link from "next/link";
-import { MessageCircle, Search } from "lucide-react";
-import ChatInbox, { InboxItem } from "@/components/chat/ChatInbox";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { useSession, appToast as toast } from "@/components/Providers";
+import { MessageCircle, Search, Loader2 } from "lucide-react";
+import ChatInbox, { type InboxItem } from "@/components/chat/ChatInbox";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Container } from "@/components/ui/Container";
+import { SectionHeading } from "@/components/ui/SectionHeading";
+import { CardSkeleton } from "@/components/ui/Skeleton";
+import { useLocale } from "@/components/LocaleProvider";
 
 export default function ChatInboxPage() {
   const { status } = useSession();
+  const { t } = useLocale();
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (status !== "authenticated") {
+      setLoading(false);
+      return;
+    }
+    const controller = new AbortController();
     async function load() {
       try {
-        const res = await fetch("/api/conversations");
+        const res = await fetch("/api/conversations", { signal: controller.signal });
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || t("chat.loadFailed"));
         setInbox(data.conversations ?? []);
-      } catch {}
-      finally { setLoading(false); }
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === "AbortError") return;
+        // Surfaced: `catch {}` made a failed load indistinguishable from an
+        // empty inbox, so people thought their messages had been lost.
+        setError(e instanceof Error ? e.message : t("chat.loadFailed"));
+      } finally {
+        setLoading(false);
+      }
     }
-    if (status === "authenticated") load();
-    else if (status === "unauthenticated") setLoading(false);
+    void load();
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  if (status === "loading" || loading) {
+  if (status === "loading" || (loading && status === "authenticated")) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-10 space-y-3">
-        <div className="h-8 w-32 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
-        <div className="h-24 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
-        <div className="h-24 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
-      </div>
+      <Container className="py-8">
+        <span className="sr-only">{t("common.loading")}</span>
+        <div className="skeleton mb-6 h-8 w-40" aria-hidden="true" />
+        <CardSkeleton count={4} />
+        <Loader2 className="sr-only" />
+      </Container>
     );
   }
 
   if (status === "unauthenticated") {
     return (
-      <div className="max-w-md mx-auto px-4 py-20 text-center">
-        <MessageCircle className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-        <h1 className="text-xl font-bold mb-2">Sign in to view messages</h1>
-        <p className="text-sm text-slate-500 mb-6">Patient–pharmacist chat requires authentication.</p>
-        <Link href="/login"><Button>Sign in</Button></Link>
-      </div>
+      <Container className="flex min-h-[60vh] items-center justify-center py-16">
+        <EmptyState
+          icon={MessageCircle}
+          title={t("chat.signInTitle")}
+          body={t("chat.signInBody")}
+          action={
+            <Link href="/login" className={buttonClasses()}>
+              {t("auth.signIn")}
+            </Link>
+          }
+        />
+      </Container>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-primary-600 dark:text-primary-400 mb-1">Inbox</p>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <MessageCircle className="h-6 w-6 text-primary-600" /> Messages
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">All your pharmacist–buyer conversations. Realtime via Socket.io + Redis.</p>
-      </div>
+    <Container className="py-8 sm:py-10">
+      <SectionHeading
+        eyebrow={t("chat.eyebrow")}
+        title={t("chat.title")}
+        description={t("chat.subtitle")}
+        className="mb-6"
+      />
 
-      {inbox.length === 0 ? (
-        <Card className="p-12 text-center border-dashed !border-2">
-          <div className="w-16 h-16 bg-primary-50 dark:bg-primary-500/10 ring-1 ring-inset ring-primary-600/15 rounded-full flex items-center justify-center mx-auto mb-4">
-            <MessageCircle className="h-8 w-8 text-primary-500" />
-          </div>
-          <h3 className="font-bold mb-1">No chats yet</h3>
-          <p className="text-sm text-slate-500 mb-6">Send a request from the homepage to start a conversation.</p>
-          <Link href="/"><Button className="rounded-full"><Search className="h-4 w-4" /> Find medicines</Button></Link>
-        </Card>
-      ) : (
-        <ChatInbox items={inbox} />
+      {error && (
+        <EmptyState
+          tone="error"
+          icon={MessageCircle}
+          title={t("chat.loadFailed")}
+          body={error}
+          action={<Button onClick={() => window.location.reload()}>{t("common.retry")}</Button>}
+        />
       )}
-    </div>
+
+      {!error && inbox.length === 0 && (
+        <EmptyState
+          icon={MessageCircle}
+          title={t("chat.emptyTitle")}
+          body={t("chat.emptyBody")}
+          action={
+            <Link href="/" className={buttonClasses()}>
+              <Search className="h-4 w-4" aria-hidden="true" />
+              {t("patient.findMedicines")}
+            </Link>
+          }
+        />
+      )}
+
+      {!error && inbox.length > 0 && <ChatInbox items={inbox} />}
+    </Container>
   );
 }

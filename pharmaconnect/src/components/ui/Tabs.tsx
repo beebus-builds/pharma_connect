@@ -20,7 +20,10 @@ export function Tabs({ value, onChange, children, className, label }: TabsProps)
     <div
       role="tablist"
       aria-label={label}
-      className={cn("flex flex-wrap gap-1 p-1 bg-stone-100 dark:bg-slate-800 rounded-xl w-fit", className)}
+      className={cn(
+        "flex max-w-full gap-1 overflow-x-auto rounded-xl bg-surface-sunken p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        className
+      )}
     >
       {children}
     </div>
@@ -46,25 +49,35 @@ export function Tab({ value, active, onSelect, children, count, tone = "default"
       role="tab"
       type="button"
       aria-selected={active}
+      // Roving arrow-key navigation, per the WAI-ARIA tabs pattern.
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+        const list = event.currentTarget.closest('[role="tablist"]');
+        if (!list) return;
+        const tabs = [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+        const index = tabs.indexOf(event.currentTarget);
+        const next = tabs[(index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
+        next?.focus();
+      }}
       onClick={() => onSelect(value)}
       className={cn(
-        "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40",
+        "inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring",
         "motion-reduce:transition-none",
         active
-          ? "bg-white dark:bg-slate-700 text-primary-700 dark:text-primary-300 shadow-card"
-          : "text-stone-500 hover:text-ink dark:text-slate-400 dark:hover:text-slate-200"
+          ? "bg-surface text-fg shadow-card"
+          : "text-fg-muted hover:text-fg"
       )}
     >
       {icon}
-      {children}
+      <span className="whitespace-nowrap">{children}</span>
       {typeof count === "number" && count > 0 && (
         <span
           className={cn(
-            "text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center tabular-nums",
+            "tabular min-w-[18px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold",
             tone === "alert"
               ? "bg-red-600 text-white"
-              : "bg-stone-200 text-stone-700 dark:bg-slate-600 dark:text-slate-200"
+              : "bg-line text-fg-muted"
           )}
         >
           {count}

@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Check, Crown, Sparkles, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Alert } from "@/components/ui/Feedback";
 import { appToast as toast } from "@/components/Providers";
+import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/utils";
 import type { Plan } from "@/lib/plans";
 
@@ -25,7 +28,9 @@ type Props = {
 
 const ICONS = { FREE: Sparkles, VERIFIED: Check, FEATURED: Crown } as const;
 
+/** Current plan + upgrade path for a signed-in pharmacy owner. */
 export default function PlanCard({ currentPlan, daysRemaining, catalog }: Props) {
+  const { t, locale } = useLocale();
   const [busy, setBusy] = useState<Plan | null>(null);
 
   const subscribe = useCallback(
@@ -41,88 +46,106 @@ export default function PlanCard({ currentPlan, daysRemaining, catalog }: Props)
           body: JSON.stringify({ plan }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to start payment");
+        if (!res.ok) throw new Error(data.error || t("common.error"));
         window.location.href = data.paymentUrl;
-      } catch (e: any) {
-        toast.error(e.message || "Something went wrong");
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : t("common.error"));
         setBusy(null);
       }
     },
-    [currentPlan]
+    [currentPlan, t]
   );
 
   const ordered = [...catalog].sort((a, b) => a.rank - b.rank);
+  const current = ordered.find((p) => p.plan === currentPlan);
 
   return (
-    <Card className="mb-8 p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
-        <h2 className="font-bold text-lg">Your plan</h2>
+    <Card className="overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">
+        <h2 className="font-display text-lg font-semibold text-fg">{t("plans.yourPlan")}</h2>
         {daysRemaining !== null && (
-          <span
-            className={cn(
-              "text-xs font-semibold px-2.5 py-1 rounded-full",
-              daysRemaining <= 5
-                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-            )}
-          >
-            {daysRemaining === 0 ? "Expires today" : `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} left`}
-          </span>
+          <Badge tone={daysRemaining <= 5 ? "warning" : "neutral"}>
+            {daysRemaining === 0
+              ? t("plans.expiresToday")
+              : t("plans.daysLeft", { count: daysRemaining })}
+          </Badge>
         )}
       </div>
-      <p className="text-sm text-slate-500 mb-5">
+
+      <p className="px-5 pt-4 text-sm text-fg-muted">
         {currentPlan === "FREE"
-          ? "Free listing: patients can find you and send requests. Paid plans add a Verified badge, priority in the verification queue, and top placement."
-          : `You are on ${ordered.find((p) => p.plan === currentPlan)?.label ?? currentPlan}.`}
+          ? t("plans.freeListingBody")
+          : t("plans.onPlan", { label: current?.label ?? currentPlan })}
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-3 p-5 pt-4 sm:grid-cols-3">
         {ordered.map((plan) => {
           const Icon = ICONS[plan.plan];
           const isCurrent = plan.plan === currentPlan;
-          const isDowngrade = plan.rank < ordered.find((p) => p.plan === currentPlan)!.rank;
+          const isDowngrade = plan.rank < (current?.rank ?? 0);
           return (
             <div
               key={plan.plan}
               className={cn(
-                "rounded-2xl border p-4 flex flex-col",
-                isCurrent ? "border-primary-500 ring-2 ring-primary-500/20 bg-primary-50/40 dark:bg-primary-950/20" : "border-slate-200 dark:border-slate-700"
+                "flex flex-col rounded-2xl border p-4 transition-colors",
+                isCurrent
+                  ? "border-accent bg-accent-soft"
+                  : "border-line bg-surface hover:border-line-strong"
               )}
             >
-              <div className="flex items-center gap-2 mb-1">
-                <Icon className={cn("h-4 w-4", plan.plan === "FEATURED" ? "text-amber-500" : "text-primary-600")} aria-hidden="true" />
-                <p className="font-bold">{plan.label}</p>
+              <div className="mb-1 flex items-center gap-2">
+                <Icon
+                  className={cn(
+                    "h-4 w-4 shrink-0",
+                    plan.plan === "FEATURED" ? "text-amber-500" : "text-accent"
+                  )}
+                  aria-hidden="true"
+                />
+                <p className="truncate text-sm font-semibold text-fg">{plan.label}</p>
               </div>
-              <p className="text-2xl font-black mb-3">
-                {plan.priceRupees === 0 ? "Free" : `Rs. ${plan.priceRupees.toLocaleString("en-NP")}`}
-                {plan.paid && <span className="text-xs font-medium text-slate-400"> / 30 days</span>}
+              <p className="tabular mb-3 font-display text-2xl font-semibold text-fg">
+                {plan.priceRupees === 0
+                  ? t("plans.free")
+                  : `Rs. ${plan.priceRupees.toLocaleString(locale === "ne" ? "ne-NP" : "en-NP")}`}
+                {plan.paid && (
+                  <span className="text-xs font-medium text-fg-subtle"> / {t("plans.perMonth")}</span>
+                )}
               </p>
-              <ul className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300 flex-1 mb-4">
+              <ul className="mb-4 flex-1 space-y-1.5">
                 {plan.benefits.map((benefit) => (
-                  <li key={benefit} className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary-600" aria-hidden="true" />
+                  <li key={benefit} className="flex items-start gap-1.5 text-xs text-fg-muted">
+                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" aria-hidden="true" />
                     <span>{benefit}</span>
                   </li>
                 ))}
               </ul>
               {isCurrent ? (
-                <Button variant="secondary" disabled>
-                  Current plan
+                <Button variant="secondary" disabled block>
+                  {t("plans.currentPlan")}
                 </Button>
               ) : isDowngrade ? (
-                <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-                  Contact support to downgrade
+                <p className="flex items-start gap-1.5 text-xs text-fg-subtle">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {t("plans.contactSupport")}
                 </p>
               ) : (
-                <Button onClick={() => subscribe(plan.plan)} loading={busy === plan.plan} disabled={busy !== null}>
-                  {currentPlan === "FREE" ? "Upgrade" : "Switch"}
+                <Button
+                  block
+                  onClick={() => void subscribe(plan.plan)}
+                  loading={busy === plan.plan}
+                  disabled={busy !== null}
+                >
+                  {currentPlan === "FREE" ? t("plans.upgrade") : t("plans.switch")}
                 </Button>
               )}
             </div>
           );
         })}
       </div>
+
+      <Alert tone="info" className="mx-5 mb-5" title={t("plans.secureTitle")}>
+        {t("plans.secureBody")}
+      </Alert>
     </Card>
   );
 }

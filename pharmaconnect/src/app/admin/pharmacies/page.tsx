@@ -1,14 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSession } from "@/components/Providers";
+import Link from "next/link";
+import { useSession, appToast as toast } from "@/components/Providers";
 import { useRouter } from "next/navigation";
-import { appToast as toast } from "@/components/Providers";
-import { ArrowLeft, BadgeCheck, Building2 } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Building2, Loader2, MapPin } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { VerifiedBadge } from "@/components/ui/Badge";
-import { cn } from "@/lib/utils";
+import { VerifiedBadge, Badge } from "@/components/ui/Badge";
+import { Tabs, Tab } from "@/components/ui/Tabs";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { CardSkeleton } from "@/components/ui/Skeleton";
+import { Container } from "@/components/ui/Container";
+import { SectionHeading } from "@/components/ui/SectionHeading";
+import { useLocale } from "@/components/LocaleProvider";
 
 interface AdminPharmacy {
   id: string;
@@ -26,36 +31,47 @@ interface AdminPharmacy {
 
 type Filter = "pending" | "verified" | "all";
 
+const FILTERS: { value: Filter; labelKey: "admin.pending" | "admin.verified" | "admin.all" }[] = [
+  { value: "pending", labelKey: "admin.pending" },
+  { value: "verified", labelKey: "admin.verified" },
+  { value: "all", labelKey: "admin.all" },
+];
+
 export default function AdminPharmaciesPage() {
   const { data: session, status } = useSession();
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("pending");
   const [items, setItems] = useState<AdminPharmacy[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
 
+  const isAdmin = session?.user.role === "ADMIN";
+
   useEffect(() => {
-    if (status === "unauthenticated") router.push("/login");
-    else if (status === "authenticated" && (session?.user.role as string) !== "ADMIN") router.push("/");
-  }, [status, router, session]);
+    if (status === "unauthenticated") router.replace("/login");
+    else if (status === "authenticated" && !isAdmin) router.replace("/");
+  }, [status, isAdmin, router]);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch(`/api/admin/pharmacies?status=${filter}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load pharmacies");
-      setItems(data.pharmacies);
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+      setItems(data.pharmacies ?? []);
+    } catch (e: unknown) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load pharmacies");
     } finally {
       setLoading(false);
     }
   }, [filter]);
 
   useEffect(() => {
-    if ((session?.user.role as string) === "ADMIN") load();
-  }, [session, load]);
+    if (isAdmin) void load();
+  }, [isAdmin, load]);
 
   async function setVerified(id: string, verified: boolean) {
     setActingId(id);
@@ -66,15 +82,15 @@ export default function AdminPharmaciesPage() {
         body: JSON.stringify({ verified }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update");
-      toast.success(verified ? "Pharmacy verified" : "Verification removed");
+      if (!res.ok) throw new Error(data.error || t("common.error"));
+      toast.success(verified ? t("admin.verifiedToast") : t("admin.unverifiedToast"));
       setItems((prev) =>
         filter === "all"
           ? prev.map((p) => (p.id === id ? { ...p, verified } : p))
           : prev.filter((p) => p.id !== id)
       );
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     } finally {
       setActingId(null);
     }
@@ -82,90 +98,124 @@ export default function AdminPharmaciesPage() {
 
   if (status === "loading" || !session) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-      </div>
+      <Container className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-accent" aria-hidden="true" />
+        <span className="sr-only">{t("common.loading")}</span>
+      </Container>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10 animate-fadeIn">
-      <button
-        onClick={() => router.push("/admin")}
-        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-6"
+    <Container className="py-8 sm:py-10">
+      <Link
+        href="/admin"
+        className="mb-5 inline-flex items-center gap-1.5 rounded-lg text-sm text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to Administration
-      </button>
-      <h1 className="text-3xl font-bold mb-1">Pharmacy verification</h1>
-      <p className="text-slate-500 mb-6">Eyeball the license + location, then flip them live.</p>
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        {t("admin.backToAdmin")}
+      </Link>
 
-      <div className="flex gap-1 mb-6 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
-        {(["pending", "verified", "all"] as Filter[]).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              "px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-colors",
-              filter === f
-                ? "bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm"
-                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-            )}
-          >
-            {f}
-          </button>
+      <SectionHeading
+        eyebrow={t("admin.eyebrow")}
+        title={t("admin.pharmaciesTitle")}
+        description={t("admin.pharmaciesBody")}
+        className="mb-6"
+      />
+
+      <Tabs
+        value={filter}
+        onChange={(value) => setFilter(value as Filter)}
+        label={t("admin.pharmaciesTitle")}
+        className="mb-6"
+      >
+        {FILTERS.map(({ value, labelKey }) => (
+          <Tab key={value} value={value} active={filter === value} onSelect={(v) => setFilter(v as Filter)}>
+            {t(labelKey)}
+          </Tab>
         ))}
-      </div>
+      </Tabs>
 
-      {loading ? (
-        <Card className="p-10 text-center text-sm text-slate-500">Loading…</Card>
-      ) : items.length === 0 ? (
-        <Card className="p-10 text-center border-dashed border-2 border-slate-200 dark:border-slate-700">
-          <Building2 className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">Nothing in this queue. Nice.</p>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {items.map((p) => (
-            <Card key={p.id} className="p-5">
-              <div className="flex flex-wrap items-start gap-3">
+      {loading && <CardSkeleton count={4} />}
+
+      {!loading && loadError && (
+        <EmptyState
+          tone="error"
+          icon={Building2}
+          title={t("admin.loadFailed")}
+          body={loadError}
+          action={<Button onClick={() => void load()}>{t("common.retry")}</Button>}
+        />
+      )}
+
+      {!loading && !loadError && items.length === 0 && (
+        <EmptyState
+          icon={Building2}
+          title={t("admin.queueClear")}
+          body={filter === "pending" ? t("admin.queueClearBody") : t("admin.noneHere")}
+        />
+      )}
+
+      {!loading && !loadError && items.length > 0 && (
+        <ul className="space-y-3">
+          {items.map((p, i) => (
+            <li
+              key={p.id}
+              className="animate-rise rounded-2xl border border-line bg-surface p-5 shadow-card transition-shadow hover:shadow-card-hover motion-reduce:animate-none"
+              style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <p className="font-bold flex items-center gap-2 flex-wrap">
-                    {p.name}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-display text-base font-semibold text-fg">{p.name}</h2>
                     {p.verified && <VerifiedBadge />}
                     {p.openReports > 0 && (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
-                        {p.openReports} open report{p.openReports === 1 ? "" : "s"}
-                      </span>
+                      <Badge tone="danger">
+                        {t("admin.openReports", { count: p.openReports })}
+                      </Badge>
                     )}
+                  </div>
+                  <p className="mt-1 text-sm text-fg-muted">
+                    {p.address} · {p.phone} · {p.email}
                   </p>
-                  <p className="text-sm text-slate-500 mt-1">{p.address} · {p.phone} · {p.email}</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    License: {p.licenseNumber ?? "—"} · Pin: {p.latitude.toFixed(4)}, {p.longitude.toFixed(4)} ·
-                    Joined {new Date(p.createdAt).toLocaleDateString()}
+                  <p className="tabular mt-1 text-xs text-fg-subtle">
+                    {t("admin.license")}: {p.licenseNumber ?? "—"} ·{" "}
+                    {t("admin.pin")}: {p.latitude.toFixed(4)}, {p.longitude.toFixed(4)} ·{" "}
+                    {t("admin.joined")}{" "}
+                    {new Date(p.createdAt).toLocaleDateString(locale === "ne" ? "ne-NP" : "en-US", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
                   </p>
                   <a
                     href={`https://www.google.com/maps/?q=${p.latitude},${p.longitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-primary-600 hover:underline underline-offset-2 mt-1 inline-block"
+                    className="mt-2 inline-flex items-center gap-1 rounded text-xs font-semibold text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
                   >
-                    Inspect pin on Google Maps
+                    <MapPin className="h-3 w-3" aria-hidden="true" />
+                    {t("admin.inspectPin")}
                   </a>
                 </div>
                 <Button
-                  className="text-xs"
+                  size="sm"
                   variant={p.verified ? "secondary" : "primary"}
                   loading={actingId === p.id}
-                  onClick={() => setVerified(p.id, !p.verified)}
+                  onClick={() => void setVerified(p.id, !p.verified)}
+                  aria-label={
+                    p.verified
+                      ? t("admin.unverifyAria", { name: p.name })
+                      : t("admin.verifyAria", { name: p.name })
+                  }
                 >
-                  <BadgeCheck className="h-3.5 w-3.5" />
-                  {p.verified ? "Unverify" : "Verify"}
+                  <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                  {p.verified ? t("admin.unverify") : t("admin.verify")}
                 </Button>
               </div>
-            </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </div>
+    </Container>
   );
 }

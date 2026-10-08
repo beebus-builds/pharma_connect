@@ -7,11 +7,8 @@ import { rateLimit } from "@/lib/rateLimit";
 import { resolveTenantLocation } from "@/lib/tenant";
 import { sendEmailInBackground } from "@/lib/mail";
 import { lowStockAlertEmail } from "@/lib/emails";
-import {
-  crossedLowThreshold,
-  effectiveThreshold,
-  DEFAULT_LOW_STOCK_THRESHOLD,
-} from "@/lib/inventory";
+import { crossedLowThreshold, effectiveThreshold, DEFAULT_LOW_STOCK_THRESHOLD } from "@/lib/inventory";
+import { runInTransaction } from "@/lib/dbTransaction";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -89,7 +86,7 @@ export async function POST(req: NextRequest) {
     // next dip after a restock still triggers exactly one alert.
     const createdLow = existing === null && quantity <= threshold;
 
-    const stock = await prisma.$transaction(async (tx) => {
+    const stock = await runInTransaction(async (tx) => {
       const updated = await tx.pharmacyStock.upsert({
         where: { locationId_medicineId: { locationId: location.id, medicineId } },
         update: {
@@ -192,8 +189,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Product not found in your inventory" }, { status: 404 });
     }
 
-    await prisma.$transaction([
-      prisma.stockHistory.create({
+    await runInTransaction(async (tx) => {
+      await tx.stockHistory.create({
         data: {
           pharmacyId,
           medicineId,
@@ -203,9 +200,9 @@ export async function DELETE(req: NextRequest) {
           note: "REMOVED from inventory",
           createdById: session.user.id,
         },
-      }),
-      prisma.pharmacyStock.delete({ where: { id: existing.id } }),
-    ]);
+      });
+      await tx.pharmacyStock.delete({ where: { id: existing.id } });
+    });
 
     return NextResponse.json({
       message: `${existing.medicine.genericName} removed from your inventory.`,

@@ -3,16 +3,17 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
-import { useSession } from "@/components/Providers";
+import { useSession, appToast as toast } from "@/components/Providers";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { appToast as toast } from "@/components/Providers";
 import Link from "next/link";
-import { Stethoscope, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { LogIn, Mail } from "lucide-react";
 import { loginSchema, type LoginInput } from "@/lib/validations";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Feedback";
 import { useLocale } from "@/components/LocaleProvider";
+import { AuthShell, PasswordField } from "../AuthShell";
 
 function LoginInner() {
   const router = useRouter();
@@ -26,8 +27,12 @@ function LoginInner() {
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
+
+  // Honour `?next=` so a deep link returns you to where you were going.
+  const next = searchParams.get("next");
 
   useEffect(() => {
     if (session) {
@@ -37,14 +42,21 @@ function LoginInner() {
 
   useEffect(() => {
     if (searchParams.get("registered") === "1") {
-      toast.success("Account created! Check your inbox for the verification email.");
+      toast.success(t("auth.registeredToast"));
     }
     if (searchParams.get("reset") === "done") {
-      toast.success("Password changed. Please log in.");
+      toast.success(t("auth.resetDoneToast"));
     }
+    // `t` is read through a local const on purpose: it changes identity on every
+    // locale switch and would re-fire these one-off toasts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   async function resendVerification(email: string) {
+    if (!email) {
+      toast.error(t("auth.emailRequiredFirst"));
+      return;
+    }
     setResending(true);
     try {
       const res = await fetch("/api/auth/resend-verification", {
@@ -53,10 +65,10 @@ function LoginInner() {
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not resend email");
-      toast.success(data.message);
-    } catch (e: any) {
-      toast.error(e.message);
+      if (!res.ok) throw new Error(data.error || t("common.error"));
+      toast.success(data.message || t("auth.verificationSent"));
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     } finally {
       setResending(false);
     }
@@ -81,101 +93,102 @@ function LoginInner() {
     }
 
     toast.success(t("auth.welcomeBack"));
-    router.push("/");
+    router.push(next && next.startsWith("/") ? next : "/");
     router.refresh();
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary-400/15 rounded-full blur-[150px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-sky-400/10 rounded-full blur-[150px]" />
-      </div>
+    <AuthShell
+      icon={LogIn}
+      title={t("auth.welcomeBack")}
+      subtitle={t("auth.loginSubtitle")}
+      footer={
+        <>
+          {t("auth.noAccount")}{" "}
+          <Link
+            href={next ? `/register?next=${encodeURIComponent(next)}` : "/register"}
+            className="rounded font-semibold text-accent transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+          >
+            {t("auth.createOne")}
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <Input
+          label={t("auth.email")}
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          placeholder="you@example.com"
+          leading={<Mail />}
+          error={errors.email?.message}
+          {...register("email")}
+        />
 
-      <div className="relative w-full max-w-md mx-auto px-4 py-12 animate-fadeIn">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-b from-primary-500 to-primary-600 text-white rounded-2xl shadow-[0_12px_32px_-8px_rgb(39_150_129/0.55)] ring-1 ring-inset ring-white/25 mb-4">
-            <Stethoscope className="h-8 w-8" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("auth.welcomeBack")}</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">{t("auth.loginSubtitle")}</p>
-        </div>
-
-        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-2xl shadow-card ring-1 ring-slate-200/80 dark:ring-slate-800 p-8">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <Input
-              label={t("auth.email")}
-              type="email"
-              placeholder="you@example.com"
-              {...register("email")}
-              error={errors.email?.message}
-            />
-            <div className="relative">
-              <Input
-                label={t("auth.password")}
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
-                {...register("password")}
-                error={errors.password?.message}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-[2.1rem] p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
-                aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-
-            <div className="flex justify-end -mt-2">
-              <Link href="/forgot-password" className="text-xs font-medium text-primary-600 hover:text-primary-700">
-                {t("auth.forgotPassword")}
-              </Link>
-            </div>
-
-            <Button type="submit" loading={isSubmitting} className="w-full">
-              {t("auth.signIn")}
-            </Button>
-          </form>
-
-          {needsVerification && (
-            <div className="mt-4 rounded-2xl ring-1 ring-inset ring-amber-600/20 bg-amber-50 dark:bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-300">
-              <p className="font-semibold">{t("auth.emailNotVerified")}</p>
-              <p className="mt-1 opacity-90">{t("auth.emailNotVerifiedHint")}</p>
-              <Button
-                variant="outline"
-                className="mt-2 w-full"
-                disabled={resending}
-                onClick={() => resendVerification((document.querySelector('input[type="email"]') as HTMLInputElement)?.value ?? "")}
-              >
-                {resending ? t("auth.sending") : t("auth.resendVerification")}
-              </Button>
-            </div>
+        <div className="space-y-1.5">
+          <label htmlFor="login-password" className="block text-sm font-medium text-fg">
+            {t("auth.password")}
+          </label>
+          <PasswordField
+            id="login-password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            show={showPassword}
+            onToggle={() => setShowPassword((v) => !v)}
+            showLabel={t("auth.showPassword")}
+            hideLabel={t("auth.hidePassword")}
+            aria-invalid={errors.password ? true : undefined}
+            className="h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-fg shadow-xs transition-[box-shadow,border-color] duration-200 placeholder:text-fg-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-ring"
+            {...register("password")}
+          />
+          {errors.password?.message && (
+            <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
+              {errors.password.message}
+            </p>
           )}
-
-          <div className="mt-6 text-center text-sm text-slate-500">
-            {t("auth.noAccount")}{" "}
-            <Link href="/register" className="text-primary-600 font-semibold hover:text-primary-700 transition-colors">
-              {t("auth.createOne")}
-            </Link>
-          </div>
         </div>
 
-        <div className="mt-6 text-center">
-          <Link href="/" className="text-xs text-slate-400 hover:text-slate-500 transition-colors">
-            {t("auth.backHome")}
+        <div className="flex justify-end">
+          <Link
+            href="/forgot-password"
+            className="rounded text-xs font-medium text-fg-muted transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+          >
+            {t("auth.forgotPassword")}
           </Link>
         </div>
-      </div>
-    </div>
+
+        <Button type="submit" block loading={isSubmitting}>
+          {t("auth.signIn")}
+        </Button>
+      </form>
+
+      {needsVerification && (
+        <Alert
+          tone="warning"
+          className="mt-5"
+          title={t("auth.emailNotVerified")}
+          live="assertive"
+          actions={
+            <Button
+              size="sm"
+              loading={resending}
+              onClick={() => void resendVerification(getValues("email"))}
+            >
+              {resending ? t("auth.sending") : t("auth.resendVerification")}
+            </Button>
+          }
+        >
+          {t("auth.emailNotVerifiedHint")}
+        </Alert>
+      )}
+    </AuthShell>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="min-h-[60vh] bg-canvas" />}>
       <LoginInner />
     </Suspense>
   );

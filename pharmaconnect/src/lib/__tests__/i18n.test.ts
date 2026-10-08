@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+// Registers every locale up front so the assertions below can read them
+// synchronously. The app loads them on demand; see `loadLocaleDictionary`.
+import "@/lib/i18n.all";
 import { translate, parseLocale, isLocale, getDictionary, DEFAULT_LOCALE } from "../i18n";
 import type { MessageKey } from "../i18n";
 

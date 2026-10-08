@@ -48,10 +48,20 @@ export default function OfflineManager() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-4 left-1/2 z-[1002] -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-medium text-white shadow-xl"
+      className="fixed inset-x-0 bottom-0 z-[1002] animate-slideUp motion-reduce:animate-none"
     >
-      <WifiOff className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <span>{t("offline.banner")}</span>
+      <div className="mx-auto mb-[calc(0.75rem+env(safe-area-inset-bottom))] flex w-[calc(100%-1.5rem)] max-w-md items-center gap-2.5 rounded-2xl border border-amber-500/25 bg-surface px-4 py-3 text-sm shadow-overlay">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
+          <WifiOff className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <p className="min-w-0 flex-1 text-fg-muted">{t("offline.banner")}</p>
+        <a
+          href="/offline"
+          className="shrink-0 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+        >
+          {t("offline.retry")}
+        </a>
+      </div>
     </div>
   );
 }

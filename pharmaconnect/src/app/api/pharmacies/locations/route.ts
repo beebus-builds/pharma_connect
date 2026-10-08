@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { locationCreateSchema, locationUpdateSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rateLimit";
 import { isInNepal } from "@/lib/nepal";
+import { runInTransaction } from "@/lib/dbTransaction";
 
 /** SPECS 4C: one login manages N branches. */
 export async function GET() {
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "You can manage up to 20 branches" }, { status: 400 });
     }
 
-    const location = await prisma.$transaction(async (tx) => {
+    const location = await runInTransaction(async (tx) => {
       // A chain has exactly one primary; making a new branch primary demotes the old one.
       if (isPrimary || existingCount === 0) {
         await tx.location.updateMany({
@@ -137,7 +138,7 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    const location = await prisma.$transaction(async (tx) => {
+    const location = await runInTransaction(async (tx) => {
       if (changes.isPrimary) {
         await tx.location.updateMany({
           where: { pharmacyId },

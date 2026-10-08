@@ -2,6 +2,155 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * PharmaConnect design tokens.
+ *
+ * Light is warm paper + pine (a pharmacy register, not a SaaS dashboard).
+ * Dark is not "slate-950": it is a deep desaturated green-black with lifted
+ * surfaces and a brighter accent, so the same components read correctly in
+ * both themes without per-element `dark:` twins.
+ */
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --canvas: 251 249 245;
+    --surface: 255 255 255;
+    --surface-raised: 255 255 255;
+    --surface-sunken: 244 241 234;
+    --surface-inverse: 20 30 27;
+
+    --fg: 26 27 25;
+    --fg-muted: 94 100 96;
+    --fg-subtle: 141 148 143;
+    --fg-inverse: 250 248 244;
+
+    --line: 228 224 216;
+    --line-strong: 208 202 191;
+
+    --accent: 23 94 76;
+    --accent-hover: 18 76 61;
+    --accent-soft: 238 246 242;
+    --accent-fg: 255 255 255;
+    --accent-ring: 29 99 83;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --canvas: 11 16 15;
+    --surface: 19 26 24;
+    --surface-raised: 26 34 32;
+    --surface-sunken: 9 13 12;
+    --surface-inverse: 245 243 238;
+
+    --fg: 233 237 234;
+    --fg-muted: 163 173 168;
+    --fg-subtle: 113 124 119;
+    --fg-inverse: 17 22 21;
+
+    --line: 36 46 43;
+    --line-strong: 51 63 59;
+
+    --accent: 74 190 160;
+    --accent-hover: 96 211 181;
+    --accent-soft: 27 58 50;
+    --accent-fg: 8 20 17;
+    --accent-ring: 96 211 181;
+  }
+
+  * {
+    border-color: rgb(var(--line));
+  }
+
+  html {
+    scroll-behavior: smooth;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Stops the sticky header from covering in-page anchors (#pharmacies). */
+    scroll-padding-top: 6rem;
+    /* Reserve the scrollbar so opening a dialog does not shift the layout. */
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    background-color: rgb(var(--canvas));
+    color: rgb(var(--fg));
+    /* Faint paper tooth: keeps large flat areas from looking like dead pixels. */
+    background-image: radial-gradient(
+      ellipse 80% 60% at 50% -10%,
+      rgb(var(--accent) / 0.05),
+      transparent 60%
+    );
+    background-attachment: fixed;
+  }
+
+  /* Headings balance, body copy sets ragged-right. Both are now baseline. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background-color: rgb(var(--accent-ring) / 0.22);
+  }
+
+  /* One visible focus treatment, expressed once. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent-ring));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Firefox: keep the same accent on scrollbars as on the rest of the chrome. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--fg-subtle) / 0.45) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--fg-subtle) / 0.32);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--fg-subtle) / 0.6);
+    background-clip: content-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
 @layer components {
   /* Layout: single source of truth for page width + gutters. */
   .container-app {
@@ -13,7 +162,7 @@
 
   /* Editorial type helpers. */
   .eyebrow {
-    @apply inline-flex items-center gap-2 text-[11px] font-bold tracking-[0.14em] uppercase text-primary-700 dark:text-primary-300;
+    @apply inline-flex items-center gap-2 text-[11px] font-bold tracking-[0.14em] uppercase text-accent;
   }
   .eyebrow::before {
     content: "";
@@ -22,54 +171,45 @@
 
   /* Surfaces: use instead of ad-hoc bg-white / border-stone combos. */
   .surface {
-    @apply rounded-2xl border border-stone-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-card;
+    @apply rounded-2xl border border-line bg-surface shadow-card;
   }
   .surface-muted {
-    @apply rounded-2xl border border-stone-200/70 dark:border-slate-800 bg-stone-50 dark:bg-slate-900/60;
+    @apply rounded-2xl border border-line bg-surface-sunken;
   }
-}
-
-:root {
-  --background: 250 247 241;
-  --foreground: 28 25 23;
-}
-
-.dark {
-  --background: 12 10 9;
-  --foreground: 231 229 228;
-}
-
-html {
-  scroll-behavior: smooth;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
+  /* Translucent surface for sticky headers and overlays. */
+  .surface-glass {
+    @apply bg-surface/80 backdrop-blur-xl backdrop-saturate-150 border-line;
   }
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+
+  /* Hairline rule used between editorial rows. */
+  .rule {
+    border-color: rgb(var(--line));
   }
-}
 
-:focus-visible {
-  outline: 2px solid #175e4c;
-  outline-offset: 2px;
-}
+  /* Fluid display sizes — one clamp() instead of a breakpoint ladder. */
+  .text-display {
+    font-size: clamp(2.25rem, 1.2rem + 4.6vw, 4.5rem);
+    line-height: 1.03;
+    letter-spacing: -0.03em;
+  }
+  .text-title {
+    font-size: clamp(1.6rem, 1.1rem + 2.1vw, 2.5rem);
+    line-height: 1.12;
+    letter-spacing: -0.025em;
+  }
 
-body {
-  background-color: rgb(var(--background));
-  color: rgb(var(--foreground));
-}
+  /* Ambient gradient wash for hero/dark sections. Cheap: two radial stops, no images. */
+  .mesh {
+    background-image:
+      radial-gradient(60% 55% at 15% 10%, rgb(var(--accent) / 0.14), transparent 60%),
+      radial-gradient(50% 50% at 85% 0%, rgb(56 130 200 / 0.12), transparent 60%),
+      radial-gradient(70% 60% at 70% 100%, rgb(var(--accent) / 0.08), transparent 60%);
+  }
 
-::selection {
-  background-color: rgb(23 94 76 / 0.22);
+  /* Tabular figures for quantities, prices, distances, counters. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* Editorial display type: serif headlines, tight measure. */
@@ -90,79 +230,142 @@ body {
   text-wrap: pretty;
 }
 
-/* Hairline rule used between editorial rows. */
-.rule {
-  border-color: rgb(28 25 23 / 0.1);
-}
-
-.dark .rule {
-  border-color: rgb(255 255 255 / 0.1);
-}
-
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgb(148 163 184 / 0.3);
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgb(148 163 184 / 0.5);
-}
-
 .skeleton {
-  @apply rounded bg-stone-200 dark:bg-slate-700;
+  @apply rounded bg-line;
   background-image: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.1) 50%,
+    rgb(var(--fg) / 0.06) 50%,
     transparent 100%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.8s linear infinite;
 }
 
-.dark .skeleton {
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.05) 50%,
-    transparent 100%
-  );
-}
-
+/* Leaflet chrome. */
 .leaflet-container {
   width: 100%;
   height: 100%;
-  border-radius: 0.75rem;
+  background: rgb(var(--surface-sunken));
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Marker ping: Leaflet DivIcons render outside Tailwind's tree, so the keyframe
+   has to exist here rather than in the config. */
+@keyframes pcPing {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.leaflet-container .leaflet-popup-content-wrapper {
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px -1px rgb(20 28 26 / 0.08), 0 12px 28px -10px rgb(20 28 26 / 0.22);
+  border: 1px solid rgb(var(--line));
+}
+
+.leaflet-container .leaflet-popup-content {
+  margin: 0.875rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgb(var(--fg));
 }
 
 .dark .leaflet-container .leaflet-tile-pane {
-  filter: brightness(0.85) invert(1) hue-rotate(180deg) saturate(0.7);
+  filter: brightness(0.82) invert(1) hue-rotate(185deg) saturate(0.65) contrast(0.92);
 }
 
 .dark .leaflet-control-attribution,
 .dark .leaflet-control-zoom a {
-  background: rgb(15 23 42);
-  color: rgb(226 232 240);
-  border-color: rgb(51 65 85);
+  background: rgb(var(--surface));
+  color: rgb(var(--fg-muted));
+  border-color: rgb(var(--line));
+}
+
+.dark .leaflet-control-attribution a {
+  color: rgb(var(--accent));
+}
+
+.dark .leaflet-bar a:hover {
+  background: rgb(var(--surface-raised));
+  color: rgb(var(--fg));
+}
+
+.leaflet-control-attribution {
+  background: rgb(var(--surface) / 0.85) !important;
+  color: rgb(var(--fg-subtle));
+  font-size: 10px;
+}
+
+.leaflet-control-attribution a {
+  color: rgb(var(--accent));
 }
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgb(148 163 184 / 0.3) transparent;
+  scrollbar-color: rgb(var(--fg-subtle) / 0.35) transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
+}
+
+/**
+ * Responsive table collapse.
+ *
+ * Below `sm` each row becomes a stacked card and every cell picks up its column
+ * name from `data-label`, so nothing important is reachable only by scrolling
+ * sideways on a phone.
+ */
+@media (max-width: 640px) {
+  .table-cards table,
+  .table-cards tbody,
+  .table-cards tr,
+  .table-cards td {
+    display: block;
+    width: 100%;
+  }
+  .table-cards thead {
+    display: none;
+  }
+  .table-cards tr {
+    border-bottom: 1px solid rgb(var(--line));
+    padding: 0.25rem 0;
+  }
+  .table-cards tr:last-child {
+    border-bottom: 0;
+  }
+  .table-cards td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    text-align: right;
+  }
+  .table-cards td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    text-align: left;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(var(--fg-subtle));
+  }
+  /* A cell with no column name is a primary field: let it own the row. */
+  .table-cards td:not([data-label]) {
+    font-size: 1rem;
+    font-weight: 600;
+    color: rgb(var(--fg));
+  }
 }
 
 .sr-only {
@@ -189,6 +392,10 @@ body {
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }

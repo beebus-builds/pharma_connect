@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-type ChipTone = "neutral" | "primary" | "danger";
+type ChipTone = "neutral" | "accent" | "danger";
 
 interface ChipProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   selected?: boolean;
@@ -28,19 +28,19 @@ export function Chip({
 }: ChipProps) {
   const tones: Record<ChipTone, string> = {
     neutral: selected
-      ? "bg-ink text-white border-ink dark:bg-white dark:text-ink dark:border-white"
-      : "bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-800",
-    primary: selected
-      ? "bg-primary-700 text-white border-primary-700 dark:bg-primary-600 dark:border-primary-600"
-      : "bg-white text-primary-700 border-primary-200 hover:border-primary-400 hover:bg-primary-50 dark:bg-slate-900 dark:text-primary-300 dark:border-primary-900/50 dark:hover:bg-primary-500/10",
+      ? "bg-fg text-fg-inverse border-fg"
+      : "bg-surface text-fg-muted border-line hover:border-line-strong hover:bg-surface-sunken hover:text-fg",
+    accent: selected
+      ? "bg-accent text-accent-fg border-accent"
+      : "bg-surface text-accent border-accent/25 hover:border-accent/50 hover:bg-accent-soft",
     danger: selected
       ? "bg-red-600 text-white border-red-600"
-      : "bg-white text-red-700 border-red-200 hover:border-red-400 hover:bg-red-50 dark:bg-slate-900 dark:text-red-300 dark:border-red-900/50 dark:hover:bg-red-500/10",
+      : "bg-surface text-red-700 border-red-600/25 hover:border-red-500/50 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10",
   };
 
   const sizes = {
-    sm: "px-2.5 py-1 text-[11px] rounded-full",
-    md: "px-3 py-1.5 text-xs rounded-full",
+    sm: "h-7 px-2.5 text-[11px] rounded-full",
+    md: "h-8 px-3 text-xs rounded-full",
   };
 
   return (
@@ -48,12 +48,13 @@ export function Chip({
       type="button"
       aria-pressed={selected}
       className={cn(
-        "inline-flex items-center gap-1.5 font-bold border transition-colors duration-150",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-paper dark:focus-visible:ring-offset-slate-950",
+        "inline-flex items-center gap-1.5 whitespace-nowrap font-semibold border transition-colors duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-canvas",
         tone === "danger"
           ? "focus-visible:ring-red-500/50"
-          : "focus-visible:ring-primary-600/40",
+          : "focus-visible:ring-accent-ring/50",
         "motion-reduce:transition-none",
+        "disabled:pointer-events-none disabled:opacity-50",
         sizes[size],
         tones[tone],
         className
@@ -77,10 +78,10 @@ interface ChipGroupProps {
 /** Wraps a set of chips with its label and a shared pill track. */
 export function ChipGroup({ label, icon, children, className, hideLabel }: ChipGroupProps) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-2", className)}>
       <span
         className={cn(
-          "text-xs font-semibold text-stone-500 dark:text-slate-400 flex items-center gap-1 shrink-0",
+          "flex shrink-0 items-center gap-1.5 text-xs font-semibold text-fg-muted",
           hideLabel && "sr-only"
         )}
       >

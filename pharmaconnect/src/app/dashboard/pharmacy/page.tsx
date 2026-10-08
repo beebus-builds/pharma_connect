@@ -1,27 +1,62 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { appToast as toast } from "@/components/Providers";
-import { motion } from "framer-motion";
-import { Plus, PackageCheck, Pill, ClipboardList, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Search, Minus, MessageCircle, ImagePlus, Trash2 } from "lucide-react";
+import {
+  Plus,
+  PackageCheck,
+  Pill,
+  ClipboardList,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  TrendingUp,
+  Search,
+  Minus,
+  MessageCircle,
+  ImagePlus,
+  Trash2,
+  RefreshCw,
+  Download,
+  Upload,
+  ImageOff,
+  Clock,
+} from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import PhotoManager from "@/components/PhotoManager";
 import PlanCard, { type PlanDefinitionDTO } from "@/components/PlanCard";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { StockBadge, StatusBadge } from "@/components/ui/Badge";
-import { ListSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { Input, Switch } from "@/components/ui/Input";
+import { StockBadge, StatusBadge, Badge } from "@/components/ui/Badge";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 import { Tabs, Tab } from "@/components/ui/Tabs";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { stockUpsertSchema, medicineCreateSchema, type StockUpsertInput, type MedicineCreateInput } from "@/lib/validations";
-import { effectiveThreshold, formatExpiry, isExpired, isExpiringSoon, DEFAULT_LOW_STOCK_THRESHOLD } from "@/lib/inventory";
+import { Alert } from "@/components/ui/Feedback";
+import { Container } from "@/components/ui/Container";
+import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Dialog } from "@/components/ui/Dialog";
+import { Chip } from "@/components/ui/Chip";
+import { useLocale } from "@/components/LocaleProvider";
+import {
+  stockUpsertSchema,
+  medicineCreateSchema,
+  type StockUpsertInput,
+  type MedicineCreateInput,
+} from "@/lib/validations";
+import {
+  effectiveThreshold,
+  formatExpiry,
+  isExpired,
+  isExpiringSoon,
+  DEFAULT_LOW_STOCK_THRESHOLD,
+} from "@/lib/inventory";
 import { stockStatus } from "@/lib/utils";
-import { cn } from "@/lib/utils";
 import type { MedicineDTO, RequestDTO } from "@/types";
 
 interface StockRow {
@@ -49,9 +84,12 @@ interface SubscriptionInfo {
   daysRemaining: number | null;
 }
 
+const QUICK_QUANTITIES = [5, 10, 25, 50];
+const HISTORY_LIMIT = 50;
+
 export default function PharmacyDashboard() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="min-h-[60vh] bg-canvas" />}>
       <PharmacyDashboardContent />
     </Suspense>
   );
@@ -59,33 +97,33 @@ export default function PharmacyDashboard() {
 
 function PharmacyDashboardContent() {
   const searchParams = useSearchParams();
+  const { t, locale } = useLocale();
+  const dateTag = locale === "ne" ? "ne-NP" : "en-US";
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [planCatalog, setPlanCatalog] = useState<PlanDefinitionDTO[]>([]);
-  const [subscribing, setSubscribing] = useState(false);
   const [stocks, setStocks] = useState<StockRow[]>([]);
   const [requests, setRequests] = useState<RequestDTO[]>([]);
   const [loadingStocks, setLoadingStocks] = useState(true);
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [selectedMedicine, setSelectedMedicine] = useState<MedicineDTO | null>(null);
   const [tab, setTab] = useState<"stock" | "requests" | "photos" | "history">("stock");
-  // History is fetched on entry, so selection routes through here rather than
-  // repeating the guard inside every Tab onClick.
-  function selectTab(next: string) {
-    if (next === "history") void loadHistory();
-    setTab(next as typeof tab);
-  }
   const [inventoryQuery, setInventoryQuery] = useState("");
-  const [qty, setQty] = useState<number>(10);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showNewProduct, setShowNewProduct] = useState(false);
-  const [newProduct, setNewProduct] = useState<MedicineCreateInput>({ genericName: "", brandName: "", strength: "", manufacturer: "" });
+  const [newProduct, setNewProduct] = useState<MedicineCreateInput>({
+    genericName: "",
+    brandName: "",
+    strength: "",
+    manufacturer: "",
+  });
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [newProductPhoto, setNewProductPhoto] = useState<File | null>(null);
   const [newProductPhotoPreview, setNewProductPhotoPreview] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [clearExpiry, setClearExpiry] = useState(false);
 
   const {
     register,
@@ -99,17 +137,41 @@ function PharmacyDashboardContent() {
     defaultValues: { quantity: 10, lowStockThreshold: DEFAULT_LOW_STOCK_THRESHOLD },
   });
 
-  const watchedQty = watch("quantity");
+  const watchedQty = Number(watch("quantity")) || 0;
+
+  // History is fetched on entry, so selection routes through here rather than
+  // repeating the guard inside every Tab onClick.
+  function selectTab(next: string) {
+    if (next === "history" && history.length === 0) void loadHistory();
+    setTab(next as typeof tab);
+  }
+
+  const formatDateTime = (value: string) =>
+    new Date(value).toLocaleString(dateTag, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  const formatFullDateTime = (value: string) =>
+    new Date(value).toLocaleString(dateTag, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
   async function loadStocks() {
     setLoadingStocks(true);
     try {
       const res = await fetch("/api/pharmacies/stock");
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load stock");
+      if (!res.ok) throw new Error(data.error || t("pharmacy.stockFailed"));
       setStocks(data.stocks ?? []);
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     } finally {
       setLoadingStocks(false);
     }
@@ -120,10 +182,10 @@ function PharmacyDashboardContent() {
     try {
       const res = await fetch("/api/requests");
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load requests");
+      if (!res.ok) throw new Error(data.error || t("pharmacy.requestsFailed"));
       setRequests(data.requests ?? []);
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     } finally {
       setLoadingRequests(false);
     }
@@ -133,29 +195,44 @@ function PharmacyDashboardContent() {
     try {
       const res = await fetch("/api/user/profile");
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load subscription");
+      if (!res.ok) return;
       if (Array.isArray(data.plans)) setPlanCatalog(data.plans);
       setSubscription({
         plan: data.user?.pharmacy?.effectivePlan ?? "FREE",
         daysRemaining: data.user?.pharmacy?.daysRemaining ?? null,
       });
     } catch {
-      // Non-critical for page load; subscription card just won't render.
+      // Non-critical for page load; the plan card simply will not render.
     }
   }
 
   useEffect(() => {
-    loadStocks();
-    loadRequests();
-    loadSubscription();
+    void loadStocks();
+    void loadRequests();
+    void loadSubscription();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const status = searchParams.get("subscription");
-    if (status === "success") toast.success("Subscription activated!");
-    else if (status === "failed") toast.error("Payment failed. Please try again.");
-    else if (status === "pending") toast("Payment is still processing.", { icon: "⏳" });
-  }, [searchParams]);
+    if (status === "success") toast.success(t("pharmacy.subscriptionActive"));
+    else if (status === "failed") toast.error(t("pharmacy.paymentFailed"));
+    else if (status === "pending") toast(t("pharmacy.paymentPending"));
+  }, [searchParams, t]);
+
+  async function loadHistory() {
+    setLoadingHistory(true);
+    try {
+      const res = await fetch(`/api/pharmacies/stock/history?limit=${HISTORY_LIMIT}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t("pharmacy.historyFailed"));
+      setHistory(data.history ?? []);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
 
   const onSubmit = async (values: StockUpsertInput) => {
     try {
@@ -165,31 +242,24 @@ function PharmacyDashboardContent() {
         body: JSON.stringify(values),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to save stock");
-      toast.success("Stock updated");
-      (data.warnings ?? []).forEach((w: string) => toast(w, { icon: "⚠️" }));
-      reset({ quantity: 10, medicineId: "" as any, expiryDate: undefined, mrp: undefined, lowStockThreshold: DEFAULT_LOW_STOCK_THRESHOLD, clearExpiry: false });
+      if (!res.ok) throw new Error(data.error || t("common.error"));
+      toast.success(t("pharmacy.stockSaved"));
+      (data.warnings ?? []).forEach((w: string) => toast(w));
+      reset({
+        quantity: 10,
+        medicineId: "" as never,
+        expiryDate: undefined,
+        mrp: undefined,
+        lowStockThreshold: DEFAULT_LOW_STOCK_THRESHOLD,
+        clearExpiry: false,
+      });
       setSelectedMedicine(null);
-      setQty(10);
-      loadStocks();
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+      setClearExpiry(false);
+      void loadStocks();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     }
   };
-
-  async function loadHistory() {
-    setLoadingHistory(true);
-    try {
-      const res = await fetch("/api/pharmacies/stock/history?limit=50");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load history");
-      setHistory(data.history ?? []);
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
-    } finally {
-      setLoadingHistory(false);
-    }
-  }
 
   function exportCsv() {
     window.location.href = "/api/pharmacies/stock/export";
@@ -197,7 +267,7 @@ function PharmacyDashboardContent() {
 
   async function importCsv(file: File) {
     if (!file.name.toLowerCase().endsWith(".csv")) {
-      toast.error("Please choose a .csv file (export first to get the template)");
+      toast.error(t("pharmacy.csvOnly"));
       return;
     }
     setImporting(true);
@@ -206,14 +276,14 @@ function PharmacyDashboardContent() {
       form.append("file", file);
       const res = await fetch("/api/pharmacies/stock/import", { method: "POST", body: form });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Import failed");
+      if (!res.ok) throw new Error(data.error || t("pharmacy.importFailed"));
       toast.success(data.message);
       if (data.errors?.length) {
-        toast(`First issue: row ${data.errors[0].row} — ${data.errors[0].message}`, { icon: "⚠️" });
+        toast(t("pharmacy.importIssue", { row: data.errors[0].row, message: data.errors[0].message }));
       }
-      loadStocks();
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+      void loadStocks();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     } finally {
       setImporting(false);
     }
@@ -226,12 +296,11 @@ function PharmacyDashboardContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update request");
-      toast.success("Request updated");
-      loadRequests();
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+      if (!res.ok) throw new Error(t("common.error"));
+      toast.success(t("pharmacy.requestUpdated"));
+      void loadRequests();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     }
   }
 
@@ -243,12 +312,11 @@ function PharmacyDashboardContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ medicineId: row.medicine.id, quantity: newQuantity }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update");
-      toast.success(newQuantity > 0 ? "Marked as available" : "Marked as unavailable");
-      loadStocks();
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+      if (!res.ok) throw new Error(t("common.error"));
+      toast.success(newQuantity > 0 ? t("pharmacy.markedAvailable") : t("pharmacy.markedUnavailable"));
+      void loadStocks();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     }
   }
 
@@ -259,11 +327,10 @@ function PharmacyDashboardContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ medicineId: row.medicine.id, quantity: Math.max(0, next) }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update stock");
-      loadStocks();
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+      if (!res.ok) throw new Error(t("common.error"));
+      void loadStocks();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     }
   }
 
@@ -275,23 +342,25 @@ function PharmacyDashboardContent() {
     }
     setConfirmDeleteId(null);
     try {
-      const res = await fetch(`/api/pharmacies/stock?medicineId=${row.medicine.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/pharmacies/stock?medicineId=${row.medicine.id}`, {
+        method: "DELETE",
+      });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to remove product");
-      toast.success(data.message || "Product removed");
-      loadStocks();
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+      if (!res.ok) throw new Error(data.error || t("common.error"));
+      toast.success(data.message || t("pharmacy.productRemoved"));
+      void loadStocks();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     }
   }
 
   async function uploadMedicinePhoto(medicineId: string, file: File): Promise<string | null> {
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be 5 MB or smaller.");
+      toast.error(t("pharmacy.photoTooLarge"));
       return null;
     }
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      toast.error("Only JPG, PNG or WebP images are allowed.");
+      toast.error(t("pharmacy.photoType"));
       return null;
     }
     setUploadingPhoto(true);
@@ -300,10 +369,10 @@ function PharmacyDashboardContent() {
       form.append("file", file);
       const res = await fetch(`/api/medicines/${medicineId}/photo`, { method: "POST", body: form });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Photo upload failed");
+      if (!res.ok) throw new Error(data.error || t("pharmacy.photoFailed"));
       return data.medicine?.imageUrl ?? null;
-    } catch (e: any) {
-      toast.error(e.message || "Photo upload failed");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("pharmacy.photoFailed"));
       return null;
     } finally {
       setUploadingPhoto(false);
@@ -315,14 +384,20 @@ function PharmacyDashboardContent() {
     try {
       const res = await fetch(`/api/medicines/${medicineId}/photo`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to remove photo");
-      setSelectedMedicine((prev) => (prev && prev.id === medicineId ? { ...prev, imageUrl: null } : prev));
-      setStocks((prev) =>
-        prev.map((s) => (s.medicine.id === medicineId ? { ...s, medicine: { ...s.medicine, imageUrl: null } } : s))
+      if (!res.ok) throw new Error(data.error || t("common.error"));
+      setSelectedMedicine((prev) =>
+        prev && prev.id === medicineId ? { ...prev, imageUrl: null } : prev
       );
-      toast.success("Product photo removed");
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+      setStocks((prev) =>
+        prev.map((s) =>
+          s.medicine.id === medicineId
+            ? { ...s, medicine: { ...s.medicine, imageUrl: null } }
+            : s
+        )
+      );
+      toast.success(t("pharmacy.photoRemoved"));
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     } finally {
       setUploadingPhoto(false);
     }
@@ -333,7 +408,7 @@ function PharmacyDashboardContent() {
     const parsed = medicineCreateSchema.safeParse(newProduct);
     if (!parsed.success) {
       const first = Object.values(parsed.error.flatten().fieldErrors).flat()[0];
-      toast.error(first || "Please fill all product fields");
+      toast.error(first || t("pharmacy.fillAllFields"));
       return;
     }
     setCreatingProduct(true);
@@ -344,7 +419,7 @@ function PharmacyDashboardContent() {
         body: JSON.stringify(parsed.data),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to add product");
+      if (!res.ok) throw new Error(data.error || t("common.error"));
       let medicine = data.medicine as MedicineDTO;
       if (newProductPhoto) {
         const url = await uploadMedicinePhoto(medicine.id, newProductPhoto);
@@ -359,9 +434,9 @@ function PharmacyDashboardContent() {
         return null;
       });
       setShowNewProduct(false);
-      toast.success(data.message || "Product added — set quantity and save stock");
-    } catch (err: any) {
-      toast.error(err.message || "Something went wrong");
+      toast.success(data.message || t("pharmacy.productAdded"));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setCreatingProduct(false);
     }
@@ -373,63 +448,83 @@ function PharmacyDashboardContent() {
   ).length;
   const outOfStockCount = stocks.filter((s) => s.quantity === 0).length;
   const expiredCount = stocks.filter((s) => isExpired(s.expiryDate)).length;
-  const expiringSoonCount = stocks.filter((s) => isExpiringSoon(s.expiryDate)).length;
+  const expiringSoonCount = stocks.filter(
+    (s) => !isExpired(s.expiryDate) && isExpiringSoon(s.expiryDate)
+  ).length;
+  // Expired batches are hidden from patient search, so counting them as
+  // "healthy" told the owner they had stock nobody could find.
+  const healthyCount = Math.max(
+    0,
+    stocks.length - lowStockCount - outOfStockCount - expiredCount
+  );
+
+  const filteredStocks = stocks.filter((row) =>
+    inventoryQuery
+      ? `${row.medicine.genericName} ${row.medicine.brandName} ${row.medicine.strength}`
+          .toLowerCase()
+          .includes(inventoryQuery.toLowerCase())
+      : true
+  );
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 animate-fadeIn">
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="eyebrow mb-2">Pharmacy console</p>
-          <h1 className="headline font-display text-3xl text-ink dark:text-white">Pharmacy Dashboard</h1>
-          <p className="text-stone-500 dark:text-slate-400 mt-1.5">Inventory and patient conversations</p>
-        </div>
-        <a href="/chat" className="self-start sm:self-auto">
-          <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold transition-colors">
-            <MessageCircle className="h-4 w-4" /> Messages
-          </span>
-        </a>
+    <Container className="py-8 sm:py-10">
+      {/* ------------------------------------------------------------- Header */}
+      <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <SectionHeading
+          eyebrow={t("pharmacy.eyebrow")}
+          title={t("pharmacy.title")}
+          description={t("pharmacy.subtitle")}
+        />
+        <Link href="/chat" className={buttonClasses({ variant: "secondary" })}>
+          <MessageCircle className="h-4 w-4" aria-hidden="true" />
+          {t("nav.messages")}
+        </Link>
       </div>
 
       {subscription && planCatalog.length > 0 && (
-        <PlanCard
-          currentPlan={subscription.plan as "FREE" | "VERIFIED" | "FEATURED"}
-          daysRemaining={subscription.daysRemaining}
-          catalog={planCatalog}
-        />
+        <div className="mb-7">
+          <PlanCard
+            currentPlan={subscription.plan as "FREE" | "VERIFIED" | "FEATURED"}
+            daysRemaining={subscription.daysRemaining}
+            catalog={planCatalog}
+          />
+        </div>
       )}
 
-      {/* Stock Health Overview — clicking a tile scrolls to the matching filter view */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-8">
+      {/* ------------------------------------------------------- Stock health */}
+      <div className="mb-7 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        <StatTile icon={PackageCheck} label={t("pharmacy.healthy")} value={healthyCount} tone="positive" />
+        <StatTile icon={AlertTriangle} label={t("pharmacy.lowStock")} value={lowStockCount} tone="warning" />
+        <StatTile icon={XCircle} label={t("pharmacy.outOfStock")} value={outOfStockCount} tone="critical" />
         <StatTile
-          icon={PackageCheck}
-          label="Healthy"
-          value={stocks.length - lowStockCount - outOfStockCount}
-          tone="positive"
+          icon={ClipboardList}
+          label={t("pharmacy.pendingRequests")}
+          value={pendingCount}
+          tone={pendingCount > 0 ? "accent" : "neutral"}
+          onClick={() => setTab("requests")}
+          caption={pendingCount > 0 ? t("pharmacy.tapToReview") : undefined}
         />
-        <StatTile icon={AlertTriangle} label="Low stock" value={lowStockCount} tone="warning" />
-        <StatTile icon={XCircle} label="Out of stock" value={outOfStockCount} tone="critical" />
       </div>
 
       {(expiredCount > 0 || expiringSoonCount > 0) && (
-        <Card className="mb-8 p-4 border-l-4 border-l-orange-500">
-          <p className="text-sm">
-            {expiredCount > 0 && (
-              <span className="font-semibold text-red-600">
-                {expiredCount} expired batch{expiredCount === 1 ? "" : "es"} hidden from patient search.{" "}
-              </span>
-            )}
-            {expiringSoonCount > 0 && (
-              <span className="text-slate-600 dark:text-slate-300">
-                {expiringSoonCount} batch{expiringSoonCount === 1 ? "" : "es"} expiring within 30 days — update the expiry after restocking.
-              </span>
-            )}
-          </p>
-        </Card>
+        <Alert
+          tone={expiredCount > 0 ? "danger" : "warning"}
+          className="mb-7"
+          title={
+            expiredCount > 0
+              ? t("pharmacy.expiryHeadlineExpired", { count: expiredCount })
+              : t("pharmacy.expiryHeadlineSoon", { count: expiringSoonCount })
+          }
+        >
+          {expiredCount > 0 && <p>{t("pharmacy.expiryExpiredBody")}</p>}
+          {expiringSoonCount > 0 && <p>{t("pharmacy.expirySoonBody")}</p>}
+        </Alert>
       )}
 
-      <Tabs value={tab} onChange={selectTab} label="Dashboard sections" className="mb-8">
+      {/* --------------------------------------------------------------- Tabs */}
+      <Tabs value={tab} onChange={selectTab} label={t("pharmacy.sections")} className="mb-6">
         <Tab value="stock" active={tab === "stock"} onSelect={selectTab} icon={<Pill className="h-4 w-4" />}>
-          Stock
+          {t("pharmacy.tabStock")}
         </Tab>
         <Tab
           value="requests"
@@ -439,116 +534,161 @@ function PharmacyDashboardContent() {
           count={pendingCount}
           tone="alert"
         >
-          Requests
+          {t("pharmacy.tabRequests")}
         </Tab>
         <Tab value="photos" active={tab === "photos"} onSelect={selectTab} icon={<ImagePlus className="h-4 w-4" />}>
-          Photos
+          {t("pharmacy.tabPhotos")}
         </Tab>
         <Tab value="history" active={tab === "history"} onSelect={selectTab} icon={<TrendingUp className="h-4 w-4" />}>
-          History
+          {t("pharmacy.tabHistory")}
         </Tab>
       </Tabs>
 
+      {/* ------------------------------------------------------------- Photos */}
       {tab === "photos" && <PhotoManager />}
 
+      {/* ------------------------------------------------------------ History */}
       {tab === "history" && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold">Stock changes <span className="text-sm font-normal text-slate-500">last {history.length}</span></h2>
-            <Button variant="secondary" className="text-xs px-3 py-1.5" onClick={loadHistory} loading={loadingHistory}>
-              Refresh
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <SectionHeading
+              title={t("pharmacy.historyTitle")}
+              // The list is capped at HISTORY_LIMIT rows; say so rather than
+              // printing the row count as if it were the total.
+              description={t("pharmacy.historySubtitle", { limit: HISTORY_LIMIT })}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void loadHistory()}
+              loading={loadingHistory}
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+              {t("common.retry")}
             </Button>
           </div>
-          {loadingHistory && <CardSkeleton count={4} />}
+
+          {loadingHistory && history.length === 0 && <CardSkeleton count={4} />}
+
           {!loadingHistory && history.length === 0 && (
             <EmptyState
               icon={TrendingUp}
-              title="No stock changes yet"
-              body="Every add, update, import and removal is logged here as you work."
+              title={t("pharmacy.historyEmpty")}
+              body={t("pharmacy.historyEmptyBody")}
             />
           )}
-          {!loadingHistory && history.length > 0 && (
-            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-              {history.map((h) => (
-                <Card key={h.id} className="p-3.5 flex items-center justify-between gap-3">
+
+          {history.length > 0 && (
+            <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+              {history.map((row, i) => (
+                <li
+                  key={row.id}
+                  className="flex animate-rise items-center justify-between gap-3 px-4 py-3 motion-reduce:animate-none"
+                  style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+                >
                   <div className="min-w-0">
-                    <p className="font-semibold text-sm">
-                      {h.medicine.genericName}{" "}
-                      <span className="text-slate-500 font-normal text-xs">({h.medicine.brandName} · {h.medicine.strength})</span>
+                    <p className="truncate text-sm font-semibold text-fg">
+                      {row.medicine.genericName}
+                      <span className="ml-1.5 text-xs font-normal text-fg-muted">
+                        {row.medicine.brandName} · {row.medicine.strength}
+                      </span>
                     </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      {new Date(h.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      {h.note ? ` · ${h.note}` : ""}
+                    <p className="tabular mt-0.5 inline-flex items-center gap-1.5 text-[11px] text-fg-subtle">
+                      <Clock className="h-3 w-3" aria-hidden="true" />
+                      {formatDateTime(row.createdAt)}
+                      {row.note ? ` · ${row.note}` : ""}
                     </p>
                   </div>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${h.delta > 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40" : h.delta < 0 ? "bg-red-100 text-red-700 dark:bg-red-950/40" : "bg-slate-100 text-slate-500"}`}>
-                    {h.delta > 0 ? `+${h.delta}` : h.delta} → {h.newQuantity}
-                  </span>
-                </Card>
+                  <Badge
+                    tone={row.delta > 0 ? "success" : row.delta < 0 ? "danger" : "neutral"}
+                    className="tabular shrink-0"
+                  >
+                    {row.delta > 0 ? `+${row.delta}` : row.delta} → {row.newQuantity}
+                  </Badge>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       )}
 
+      {/* -------------------------------------------------------------- Stock */}
       {tab === "stock" && (
-        <div className="grid md:grid-cols-5 gap-6">
-          <Card className="md:col-span-2 p-6 h-fit">
-            <h2 className="font-bold mb-1 flex items-center gap-2">
-              <div className="p-1.5 bg-primary-100 dark:bg-primary-900/40 text-primary-600 rounded-lg">
-                <Plus className="h-4 w-4" />
-              </div>
-              Add medicine
+        <div className="grid gap-6 lg:grid-cols-5">
+          <Card className="h-fit p-5 lg:col-span-2">
+            <h2 className="mb-1 flex items-center gap-2 font-display text-lg font-semibold text-fg">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+              </span>
+              {t("pharmacy.addMedicine")}
             </h2>
-            <p className="text-xs text-slate-500 mb-5">Update stock levels for a medicine</p>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <p className="mb-5 text-xs text-fg-muted">{t("pharmacy.addMedicineBody")}</p>
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Medicine</label>
+                <span className="mb-1 block text-sm font-medium text-fg">
+                  {t("pharmacy.medicine")}
+                </span>
                 <SearchBar
                   selected={selectedMedicine}
                   onSelect={(m) => {
                     setSelectedMedicine(m);
                     setValue("medicineId", m.id);
-                    // Editing an existing row? Prefill its values.
                     const row = stocks.find((s) => s.medicine.id === m.id);
                     if (row) {
                       setValue("quantity", row.quantity, { shouldValidate: true });
-                      setQty(row.quantity);
                       setValue("mrp", row.mrp ?? undefined);
                       setValue("lowStockThreshold", row.lowStockThreshold);
                       setValue(
                         "expiryDate",
-                        row.expiryDate ? (new Date(row.expiryDate).toISOString().slice(0, 10) as any) : undefined
+                        row.expiryDate
+                          ? (new Date(row.expiryDate).toISOString().slice(0, 10) as never)
+                          : undefined
                       );
-                      setValue("clearExpiry", false);
+                      setClearExpiry(false);
                     }
                   }}
                   onClear={() => setSelectedMedicine(null)}
                 />
-                {errors.medicineId && <p className="text-xs text-red-600 mt-1">{errors.medicineId.message}</p>}
+                {errors.medicineId && (
+                  <p role="alert" className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
+                    {errors.medicineId.message}
+                  </p>
+                )}
+
                 {selectedMedicine && (
-                  <div className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-2.5">
+                  <div className="mt-2 flex items-center gap-3 rounded-xl border border-line p-2.5">
                     {selectedMedicine.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={selectedMedicine.imageUrl}
-                        alt={selectedMedicine.genericName}
-                        className="h-12 w-12 rounded-lg object-cover shrink-0"
+                        alt=""
+                        className="h-12 w-12 shrink-0 rounded-lg object-cover"
                       />
                     ) : (
-                      <span className="h-12 w-12 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs text-slate-400 shrink-0">
-                        No photo
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-sunken text-fg-subtle">
+                        <ImageOff className="h-5 w-5" aria-hidden="true" />
                       </span>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold truncate">{selectedMedicine.genericName}</p>
-                      <div className="flex gap-2 mt-1">
-                        <label className={`text-[11px] font-bold cursor-pointer text-primary-600 hover:underline ${uploadingPhoto ? "opacity-50 pointer-events-none" : ""}`}>
-                          {uploadingPhoto ? "Uploading…" : selectedMedicine.imageUrl ? "Replace photo" : "Add photo"}
+                      <p className="truncate text-xs font-semibold text-fg">
+                        {selectedMedicine.genericName}
+                      </p>
+                      <div className="mt-1.5 flex gap-3">
+                        <label
+                          className={`cursor-pointer text-[11px] font-semibold text-accent hover:underline ${
+                            uploadingPhoto ? "pointer-events-none opacity-50" : ""
+                          }`}
+                        >
+                          {uploadingPhoto
+                            ? t("common.saving")
+                            : selectedMedicine.imageUrl
+                              ? t("pharmacy.replacePhoto")
+                              : t("pharmacy.addPhoto")}
                           <input
                             type="file"
                             accept="image/jpeg,image/png,image/webp"
-                            className="hidden"
+                            className="sr-only"
                             disabled={uploadingPhoto}
                             onChange={async (e) => {
                               const f = e.target.files?.[0];
@@ -564,7 +704,7 @@ function PharmacyDashboardContent() {
                                       : s
                                   )
                                 );
-                                toast.success("Product photo updated");
+                                toast.success(t("pharmacy.photoUpdated"));
                               }
                             }}
                           />
@@ -573,472 +713,496 @@ function PharmacyDashboardContent() {
                           <button
                             type="button"
                             disabled={uploadingPhoto}
-                            onClick={() => removeMedicinePhoto(selectedMedicine.id)}
-                            className="text-[11px] font-bold text-red-600 hover:underline disabled:opacity-50"
+                            onClick={() => void removeMedicinePhoto(selectedMedicine.id)}
+                            className="text-[11px] font-semibold text-red-600 hover:underline disabled:opacity-50"
                           >
-                            Remove
+                            {t("common.dismiss")}
                           </button>
                         )}
                       </div>
                     </div>
                   </div>
                 )}
+
                 <button
                   type="button"
                   onClick={() => setShowNewProduct(true)}
-                  className="text-xs font-semibold text-primary-600 hover:text-primary-700 hover:underline underline-offset-2 mt-1.5"
+                  className="mt-2 rounded text-xs font-semibold text-accent underline-offset-2 hover:underline"
                 >
-                  Can&apos;t find your product? Add it to the catalog
+                  {t("pharmacy.addToCatalog")}
                 </button>
               </div>
 
+              {/* Quantity stepper: the primary interaction of this whole page. */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Quantity in stock</label>
+                <label
+                  htmlFor="stock-quantity"
+                  className="mb-1 block text-sm font-medium text-fg"
+                >
+                  {t("pharmacy.quantity")}
+                </label>
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
                     type="button"
-                    onClick={() => {
-                      const next = Math.max(0, (Number(watchedQty) || 0) - 1);
-                      setValue("quantity", next, { shouldValidate: true });
-                      setQty(next);
-                    }}
-                    className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
-                    aria-label="Decrease quantity"
+                    variant="secondary"
+                    size="icon"
+                    onClick={() =>
+                      setValue("quantity", Math.max(0, watchedQty - 1), { shouldValidate: true })
+                    }
+                    aria-label={t("pharmacy.decrease")}
                   >
-                    <Minus className="h-4 w-4" />
-                  </button>
+                    <Minus className="h-4 w-4" aria-hidden="true" />
+                  </Button>
                   <input
+                    id="stock-quantity"
                     type="number"
+                    inputMode="numeric"
                     min={0}
                     {...register("quantity", { valueAsNumber: true })}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10) || 0;
-                      setQty(v);
-                    }}
-                    className="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                    className="tabular h-10 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-center text-sm font-semibold text-fg shadow-xs transition-[box-shadow,border-color] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-ring"
                     placeholder="0"
                   />
-                  <button
+                  <Button
                     type="button"
-                    onClick={() => {
-                      const next = (Number(watchedQty) || 0) + 1;
-                      setValue("quantity", next, { shouldValidate: true });
-                      setQty(next);
-                    }}
-                    className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
-                    aria-label="Increase quantity"
+                    variant="secondary"
+                    size="icon"
+                    onClick={() => setValue("quantity", watchedQty + 1, { shouldValidate: true })}
+                    aria-label={t("pharmacy.increase")}
                   >
-                    <Plus className="h-4 w-4" />
-                  </button>
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                  </Button>
                 </div>
-                <div className="flex gap-1.5 mt-2">
-                  {[5, 10, 25, 50].map((n) => (
-                    <button
+                <div className="mt-2 flex gap-1.5">
+                  {QUICK_QUANTITIES.map((n) => (
+                    <Chip
                       key={n}
-                      type="button"
-                      onClick={() => {
-                        setValue("quantity", n, { shouldValidate: true });
-                        setQty(n);
-                      }}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border ${Number(watchedQty) === n ? "bg-primary-600 text-white border-primary-600" : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100"}`}
+                      size="sm"
+                      selected={watchedQty === n}
+                      onClick={() => setValue("quantity", n, { shouldValidate: true })}
+                      className="flex-1 justify-center tabular"
                     >
                       {n}
-                    </button>
+                    </Chip>
                   ))}
                 </div>
-                {errors.quantity && <p className="text-xs text-red-600 mt-1">{errors.quantity.message}</p>}
+                {errors.quantity && (
+                  <p role="alert" className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
+                    {errors.quantity.message}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Expiry (optional)</label>
-                  <input
-                    type="date"
-                    {...register("expiryDate", { valueAsDate: false } as any)}
-                    className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                  />
-                  {errors.expiryDate && <p className="text-xs text-red-600 mt-1">{errors.expiryDate.message as string}</p>}
-                  <label className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">
-                    <input type="checkbox" {...register("clearExpiry")} className="rounded" />
-                    Clear expiry
-                  </label>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">MRP Rs. (optional)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder="e.g. 45"
-                    {...register("mrp", { valueAsNumber: false } as any)}
-                    className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                  />
-                  {errors.mrp && <p className="text-xs text-red-600 mt-1">{errors.mrp.message as string}</p>}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Low-stock alert at (units)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  {...register("lowStockThreshold", { valueAsNumber: false } as any)}
-                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                <Input
+                  label={`${t("pharmacy.expiry")} · ${t("auth.optional")}`}
+                  type="date"
+                  {...register("expiryDate", { valueAsDate: false } as never)}
+                  error={errors.expiryDate?.message as string | undefined}
+                  disabled={clearExpiry}
                 />
-                <p className="text-[11px] text-slate-400 mt-1">You&apos;ll get one email each time stock dips to this level.</p>
-                {errors.lowStockThreshold && <p className="text-xs text-red-600 mt-1">{errors.lowStockThreshold.message as string}</p>}
+                <Input
+                  label={`${t("pharmacy.mrp")} · ${t("auth.optional")}`}
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  placeholder="45"
+                  {...register("mrp", { valueAsNumber: false } as never)}
+                  error={errors.mrp?.message as string | undefined}
+                />
               </div>
 
-              <Button type="submit" loading={isSubmitting} className="w-full">
-                <PackageCheck className="h-4 w-4" />
-                Save stock
+              <Switch
+                checked={clearExpiry}
+                onChange={(checked) => {
+                  setClearExpiry(checked);
+                  setValue("clearExpiry", checked);
+                  if (checked) setValue("expiryDate", undefined);
+                }}
+                label={t("pharmacy.clearExpiry")}
+              />
+
+              <Input
+                label={t("pharmacy.lowStockAlert")}
+                type="number"
+                inputMode="numeric"
+                min={0}
+                hint={t("pharmacy.lowStockHint")}
+                {...register("lowStockThreshold", { valueAsNumber: false } as never)}
+                error={errors.lowStockThreshold?.message as string | undefined}
+              />
+
+              <Button type="submit" block loading={isSubmitting}>
+                <PackageCheck className="h-4 w-4" aria-hidden="true" />
+                {t("pharmacy.saveStock")}
               </Button>
             </form>
           </Card>
 
-          <div className="md:col-span-3">
+          <div className="lg:col-span-3">
             <div className="mb-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="font-bold">
-                  Current inventory <span className="text-sm font-normal text-slate-500">{stocks.length} items</span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-display text-lg font-semibold text-fg">
+                  {t("pharmacy.currentInventory")}
+                  <span className="tabular ml-2 text-sm font-normal text-fg-muted">
+                    {stocks.length} {t("pharmacy.items")}
+                  </span>
                 </h2>
-                <div className="flex gap-1.5 shrink-0">
-                  <button
-                    onClick={exportCsv}
-                    className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    title="Download inventory as CSV"
-                  >
-                    Export
-                  </button>
+                <div className="flex shrink-0 gap-1.5">
+                  <Button variant="secondary" size="xs" onClick={exportCsv}>
+                    <Download className="h-3 w-3" aria-hidden="true" />
+                    {t("pharmacy.export")}
+                  </Button>
                   <label
-                    className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer ${importing ? "opacity-50 pointer-events-none" : ""}`}
-                    title="Bulk upload from CSV (same columns as export)"
+                    className={`inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-line px-2.5 text-[11px] font-semibold text-fg-muted transition-colors hover:bg-surface-sunken hover:text-fg ${
+                      importing ? "pointer-events-none opacity-50" : ""
+                    }`}
+                    title={t("pharmacy.importTitle")}
                   >
-                    {importing ? "Importing…" : "Import"}
+                    <Upload className="h-3 w-3" aria-hidden="true" />
+                    {importing ? t("common.loading") : t("pharmacy.import")}
                     <input
                       type="file"
                       accept=".csv,text/csv"
-                      className="hidden"
+                      className="sr-only"
                       disabled={importing}
                       onChange={(e) => {
                         const f = e.target.files?.[0];
                         e.target.value = "";
-                        if (f) importCsv(f);
+                        if (f) void importCsv(f);
                       }}
                     />
                   </label>
                 </div>
               </div>
+
               {stocks.length > 0 && (
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" aria-hidden="true" />
-                  <input
-                    value={inventoryQuery}
-                    onChange={(e) => setInventoryQuery(e.target.value)}
-                    placeholder="Filter inventory…"
-                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                    aria-label="Filter inventory"
-                  />
-                </div>
+                <Input
+                  value={inventoryQuery}
+                  onChange={(e) => setInventoryQuery(e.target.value)}
+                  placeholder={t("pharmacy.filterInventory")}
+                  aria-label={t("pharmacy.filterInventory")}
+                  leading={<Search />}
+                />
               )}
             </div>
+
             {loadingStocks && <CardSkeleton count={4} />}
+
             {!loadingStocks && stocks.length === 0 && (
               <EmptyState
                 icon={Pill}
-                title="No medicines in your inventory yet"
-                body="Use the form to add your first item, or import a CSV from Export."
+                title={t("pharmacy.inventoryEmpty")}
+                body={t("pharmacy.inventoryEmptyBody")}
               />
             )}
-            {!loadingStocks && stocks.length > 0 && (() => {
-              const filtered = stocks.filter((r) =>
-                inventoryQuery
-                  ? `${r.medicine.genericName} ${r.medicine.brandName} ${r.medicine.strength}`.toLowerCase().includes(inventoryQuery.toLowerCase())
-                  : true
-              );
-              if (filtered.length === 0) {
-                return (
-                  <EmptyState
-                    icon={Search}
-                    title="No matches"
-                    body={`Nothing in your inventory matches “${inventoryQuery}”.`}
-                    action={
-                      <Button variant="outline" size="sm" onClick={() => setInventoryQuery("")}>
-                        Clear filter
-                      </Button>
-                    }
-                  />
-                );
-              }
-              return (
-                <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-                  {filtered.map((row, i) => (
-                    <Card key={row.id} className="p-4 flex items-center justify-between gap-3 hover:shadow-md transition-shadow animate-fadeIn" style={{ animationDelay: `${i * 20}ms` }}>
-                      {row.medicine.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={row.medicine.imageUrl}
-                          alt={row.medicine.genericName}
-                          className="h-12 w-12 rounded-xl object-cover shrink-0"
-                        />
-                      ) : null}
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm">{row.medicine.genericName}</p>
-                        <p className="text-xs text-slate-500 truncate">
-                          {row.medicine.brandName} {row.medicine.strength}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700">Qty: {row.quantity}</span>
-                          <StockBadge status={stockStatus(row.quantity, effectiveThreshold(row.lowStockThreshold))} />
-                          {row.mrp !== null && row.mrp !== undefined && (
-                            <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">Rs. {row.mrp}</span>
-                          )}
-                          {row.expiryDate ? (
-                            isExpired(row.expiryDate) ? (
-                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-950/40">Expired — hidden</span>
-                            ) : (
-                              <span className={`text-[11px] font-medium ${isExpiringSoon(row.expiryDate) ? "text-amber-600 font-bold" : "text-slate-400"}`}>
-                                Exp {formatExpiry(row.expiryDate)}
-                              </span>
-                            )
-                          ) : (
-                            <span className="text-[11px] text-slate-300">No expiry</span>
-                          )}
-                          <span className="text-[11px] text-slate-400" title="Email alert threshold">
-                            alert ≤ {effectiveThreshold(row.lowStockThreshold)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1.5 shrink-0">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => adjustStock(row, row.quantity - 1)}
-                            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
-                            aria-label="Decrease stock"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={() => adjustStock(row, row.quantity + 1)}
-                            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
-                            aria-label="Increase stock"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={() => deleteStockRow(row)}
-                            className={`p-1.5 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/20 transition-colors ${
-                              confirmDeleteId === row.medicine.id
-                                ? "bg-red-600 border-red-600 text-white"
-                                : "border-slate-200 dark:border-slate-700 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
-                            }`}
-                            aria-label={confirmDeleteId === row.medicine.id ? "Click again to confirm removal" : "Remove product from inventory"}
-                            title={confirmDeleteId === row.medicine.id ? "Click again to confirm" : "Remove from inventory"}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                        {confirmDeleteId === row.medicine.id && (
-                          <p className="text-[10px] font-semibold text-red-600 text-right">Tap trash again to confirm</p>
+
+            {!loadingStocks && stocks.length > 0 && filteredStocks.length === 0 && (
+              <EmptyState
+                icon={Search}
+                title={t("pharmacy.noMatches")}
+                body={t("pharmacy.noMatchesBody", { query: inventoryQuery })}
+                action={
+                  <Button variant="outline" size="sm" onClick={() => setInventoryQuery("")}>
+                    {t("common.clearFilters")}
+                  </Button>
+                }
+              />
+            )}
+
+            {filteredStocks.length > 0 && (
+              <ul className="max-h-[640px] space-y-2 overflow-y-auto pr-1">
+                {filteredStocks.map((row, i) => (
+                  <li
+                    key={row.id}
+                    className="flex animate-rise items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 shadow-card transition-shadow hover:shadow-card-hover motion-reduce:animate-none"
+                    style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+                  >
+                    {row.medicine.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={row.medicine.imageUrl}
+                        alt=""
+                        loading="lazy"
+                        className="h-12 w-12 shrink-0 rounded-xl object-cover"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-fg">
+                        {row.medicine.genericName}
+                      </p>
+                      <p className="truncate text-xs text-fg-muted">
+                        {row.medicine.brandName} {row.medicine.strength}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <Badge tone="neutral" className="tabular">
+                          {t("pharmacy.qty", { count: row.quantity })}
+                        </Badge>
+                        <StockBadge status={stockStatus(row.quantity, effectiveThreshold(row.lowStockThreshold))} />
+                        {row.mrp != null && (
+                          <Badge tone="accent" className="tabular">
+                            Rs. {row.mrp}
+                          </Badge>
                         )}
-                        <Button
-                          variant={row.quantity > 0 ? "secondary" : "primary"}
-                          className="text-[11px] px-2.5 py-1 w-full"
-                          onClick={() => toggleAvailability(row)}
-                        >
-                          {row.quantity > 0 ? (
-                            <>
-                              <XCircle className="h-3 w-3" /> Out
-                            </>
+                        {row.expiryDate ? (
+                          isExpired(row.expiryDate) ? (
+                            <Badge tone="danger">{t("pharmacy.expiredHidden")}</Badge>
                           ) : (
-                            <>
-                              <CheckCircle2 className="h-3 w-3" /> In stock
-                            </>
-                          )}
+                            <span
+                              className={`tabular text-[11px] ${
+                                isExpiringSoon(row.expiryDate)
+                                  ? "font-bold text-amber-600"
+                                  : "text-fg-subtle"
+                              }`}
+                            >
+                              {t("pharmacy.expShort")} {formatExpiry(row.expiryDate)}
+                            </span>
+                          )
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="secondary"
+                          size="icon-sm"
+                          onClick={() => void adjustStock(row, row.quantity - 1)}
+                          aria-label={t("pharmacy.decreaseNamed", {
+                            name: row.medicine.genericName,
+                          })}
+                        >
+                          <Minus className="h-3 w-3" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="icon-sm"
+                          onClick={() => void adjustStock(row, row.quantity + 1)}
+                          aria-label={t("pharmacy.increaseNamed", {
+                            name: row.medicine.genericName,
+                          })}
+                        >
+                          <Plus className="h-3 w-3" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="icon-sm"
+                          onClick={() => void deleteStockRow(row)}
+                          aria-label={
+                            confirmDeleteId === row.medicine.id
+                              ? t("pharmacy.confirmRemoveAria")
+                              : t("pharmacy.removeAria", { name: row.medicine.genericName })
+                          }
+                          className={
+                            confirmDeleteId === row.medicine.id
+                              ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+                              : "text-fg-subtle hover:border-red-300 hover:text-red-600"
+                          }
+                        >
+                          <Trash2 className="h-3 w-3" aria-hidden="true" />
                         </Button>
                       </div>
-                    </Card>
-                  ))}
-                </div>
-              );
-            })()}
+                      <Button
+                        variant={row.quantity > 0 ? "secondary" : "primary"}
+                        size="xs"
+                        onClick={() => void toggleAvailability(row)}
+                      >
+                        {row.quantity > 0 ? (
+                          <>
+                            <XCircle className="h-3 w-3" aria-hidden="true" />
+                            {t("pharmacy.markOut")}
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                            {t("pharmacy.markIn")}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       )}
 
-      {showNewProduct && (
-        <div
-          className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/50 p-4"
-          onClick={() => setShowNewProduct(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Add a new product"
-        >
-          <form
-            onSubmit={createNewProduct}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl space-y-4"
-          >
-            <div>
-              <h3 className="font-bold text-base">Add a new product</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Not in our catalog? Add it once — every pharmacy can then stock it.</p>
-            </div>
-            <Input
-              label="Generic name"
-              placeholder="e.g. Paracetamol"
-              value={newProduct.genericName}
-              onChange={(e) => setNewProduct((p) => ({ ...p, genericName: e.target.value }))}
-            />
-            <Input
-              label="Brand name"
-              placeholder="e.g. Napa"
-              value={newProduct.brandName}
-              onChange={(e) => setNewProduct((p) => ({ ...p, brandName: e.target.value }))}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Strength"
-                placeholder="e.g. 500mg"
-                value={newProduct.strength}
-                onChange={(e) => setNewProduct((p) => ({ ...p, strength: e.target.value }))}
-              />
-              <Input
-                label="Manufacturer"
-                placeholder="e.g. Beximco"
-                value={newProduct.manufacturer}
-                onChange={(e) => setNewProduct((p) => ({ ...p, manufacturer: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Pack photo (optional)
-              </label>
-              <div className="flex items-center gap-3">
-                {newProductPhotoPreview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={newProductPhotoPreview} alt="Pack preview" className="h-14 w-14 rounded-xl object-cover shrink-0" />
-                ) : (
-                  <span className="h-14 w-14 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] text-slate-400 shrink-0">
-                    No photo
-                  </span>
-                )}
-                <div className="flex-1">
-                  <label className="text-xs font-bold cursor-pointer text-primary-600 hover:underline">
-                    Choose JPG/PNG/WebP ≤ 5 MB
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0] ?? null;
-                        e.target.value = "";
-                        setNewProductPhoto(f);
-                        setNewProductPhotoPreview((prev) => {
-                          if (prev) URL.revokeObjectURL(prev);
-                          return f ? URL.createObjectURL(f) : null;
-                        });
-                      }}
-                    />
-                  </label>
-                  {newProductPhoto && (
-                    <p className="text-[11px] text-slate-500 truncate mt-0.5">{newProductPhoto.name}</p>
-                  )}
-                </div>
-                {newProductPhoto && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewProductPhoto(null);
-                      setNewProductPhotoPreview((prev) => {
-                        if (prev) URL.revokeObjectURL(prev);
-                        return null;
-                      });
-                    }}
-                    className="text-[11px] font-bold text-red-600 hover:underline shrink-0"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" className="flex-1 text-xs" onClick={() => setShowNewProduct(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" loading={creatingProduct} className="flex-1 text-xs">
-                Add product
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
-
+      {/* ----------------------------------------------------------- Requests */}
       {tab === "requests" && (
         <div>
           {loadingRequests && <CardSkeleton count={3} />}
           {!loadingRequests && requests.length === 0 && (
             <EmptyState
               icon={ClipboardList}
-              title="No patient requests yet"
-              body="Requests appear here the moment a patient asks you for a medicine. Keeping stock accurate means more of them find you first."
+              title={t("pharmacy.requestsEmpty")}
+              body={t("pharmacy.requestsEmptyBody")}
             />
           )}
           {!loadingRequests && requests.length > 0 && (
-            <div className="space-y-3">
+            <ul className="space-y-3">
               {requests.map((r, i) => (
-                <Card key={r.id} className="p-5 flex items-center justify-between gap-4 hover:shadow-md transition-shadow animate-fadeIn" style={{ animationDelay: `${i * 50}ms` }}>
+                <li
+                  key={r.id}
+                  className="flex animate-rise flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-card transition-shadow hover:shadow-card-hover motion-reduce:animate-none sm:flex-row sm:items-center sm:justify-between sm:p-5"
+                  style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+                >
                   <div className="min-w-0">
-                    <p className="font-semibold">
-                      {r.medicine.genericName} <span className="text-slate-500 font-normal text-sm">({r.medicine.brandName})</span>
+                    <p className="font-semibold text-fg">
+                      {r.medicine.genericName}{" "}
+                      <span className="text-sm font-normal text-fg-muted">
+                        ({r.medicine.brandName})
+                      </span>
                     </p>
-                    <p className="text-sm text-slate-500 mt-0.5">
-                      From {r.patient.name} &middot; {r.patient.email}
+                    <p className="mt-0.5 text-sm text-fg-muted">
+                      {t("pharmacy.from")}{" "}
+                      <span className="font-medium text-fg">{r.patient.name}</span> · {r.patient.email}
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {new Date(r.createdAt).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                    <p className="tabular mt-1 text-xs text-fg-subtle">
+                      {formatFullDateTime(r.createdAt)}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <StatusBadge status={r.status} />
-                    <a href={`/chat/${r.id}`}>
-                      <Button variant="secondary" className="text-xs px-3 py-1.5 rounded-full">
-                        <MessageCircle className="h-3.5 w-3.5" /> Chat
-                      </Button>
-                    </a>
+                    <Link
+                      href={`/chat/${r.id}`}
+                      className={buttonClasses({ size: "sm", variant: "secondary" })}
+                      aria-label={t("patient.chatWith", { name: r.patient.name })}
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t("patient.chat")}
+                    </Link>
                     {r.status === "PENDING" && (
                       <>
                         <Button
-                          variant="secondary"
-                          className="text-xs px-3 py-1.5"
-                          onClick={() => updateRequestStatus(r.id, "AVAILABLE")}
+                          size="sm"
+                          onClick={() => void updateRequestStatus(r.id, "AVAILABLE")}
                         >
-                          <CheckCircle2 className="h-3 w-3" />
-                          Available
+                          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          {t("badge.inStock")}
                         </Button>
                         <Button
                           variant="danger"
-                          className="text-xs px-3 py-1.5"
-                          onClick={() => updateRequestStatus(r.id, "UNAVAILABLE")}
+                          size="sm"
+                          onClick={() => void updateRequestStatus(r.id, "UNAVAILABLE")}
                         >
-                          <XCircle className="h-3 w-3" />
-                          Unavailable
+                          <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                          {t("badge.outOfStock")}
                         </Button>
                       </>
                     )}
                   </div>
-                </Card>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       )}
-    </div>
+
+      {/* ------------------------------------------------- Add-to-catalog modal */}
+      <Dialog
+        open={showNewProduct}
+        onClose={() => setShowNewProduct(false)}
+        size="md"
+        title={t("pharmacy.newProductTitle")}
+        description={t("pharmacy.newProductBody")}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowNewProduct(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" form="new-product-form" loading={creatingProduct}>
+              {t("pharmacy.addProduct")}
+            </Button>
+          </>
+        }
+      >
+        <form id="new-product-form" onSubmit={createNewProduct} className="space-y-4">
+          <Input
+            label={t("pharmacy.genericName")}
+            placeholder="Paracetamol"
+            value={newProduct.genericName}
+            onChange={(e) => setNewProduct((p) => ({ ...p, genericName: e.target.value }))}
+            data-autofocus="true"
+          />
+          <Input
+            label={t("pharmacy.brandName")}
+            placeholder="Napa"
+            value={newProduct.brandName}
+            onChange={(e) => setNewProduct((p) => ({ ...p, brandName: e.target.value }))}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label={t("pharmacy.strength")}
+              placeholder="500mg"
+              value={newProduct.strength}
+              onChange={(e) => setNewProduct((p) => ({ ...p, strength: e.target.value }))}
+            />
+            <Input
+              label={t("pharmacy.manufacturer")}
+              placeholder="Beximco"
+              value={newProduct.manufacturer}
+              onChange={(e) => setNewProduct((p) => ({ ...p, manufacturer: e.target.value }))}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-fg">
+              {t("pharmacy.packPhoto")} · {t("auth.optional")}
+            </p>
+            <div className="flex items-center gap-3">
+              {newProductPhotoPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={newProductPhotoPreview}
+                  alt=""
+                  className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                />
+              ) : (
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-surface-sunken text-fg-subtle">
+                  <ImageOff className="h-5 w-5" aria-hidden="true" />
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <label className="cursor-pointer text-xs font-semibold text-accent hover:underline">
+                  {t("pharmacy.choosePhoto")}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      e.target.value = "";
+                      setNewProductPhoto(f);
+                      setNewProductPhotoPreview((prev) => {
+                        if (prev) URL.revokeObjectURL(prev);
+                        return f ? URL.createObjectURL(f) : null;
+                      });
+                    }}
+                  />
+                </label>
+                {newProductPhoto && (
+                  <p className="mt-0.5 truncate text-[11px] text-fg-subtle">{newProductPhoto.name}</p>
+                )}
+              </div>
+              {newProductPhoto && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    setNewProductPhoto(null);
+                    setNewProductPhotoPreview((prev) => {
+                      if (prev) URL.revokeObjectURL(prev);
+                      return null;
+                    });
+                  }}
+                >
+                  {t("common.dismiss")}
+                </Button>
+              )}
+            </div>
+          </div>
+        </form>
+      </Dialog>
+    </Container>
   );
 }

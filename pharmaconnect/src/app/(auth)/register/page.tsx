@@ -2,23 +2,55 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { appToast as toast } from "@/components/Providers";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
+import { appToast as toast } from "@/components/Providers";
 import { motion, AnimatePresence } from "framer-motion";
-import { Stethoscope, UserRound, Building2, Check, Eye, EyeOff } from "lucide-react";
+import { UserPlus, UserRound, Building2, Check } from "lucide-react";
 import { registerSchema, type RegisterInput } from "@/lib/validations";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import GoogleMapPicker from "@/components/GoogleMapPicker";
-import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/Feedback";
 import { useLocale } from "@/components/LocaleProvider";
+import GoogleMapPicker from "@/components/GoogleMapPicker";
+import { AuthShell, PasswordField } from "../AuthShell";
+import type { MessageKey } from "@/lib/i18n";
 
-export default function RegisterPage() {
+const ROLES = [
+  { value: "PATIENT", icon: UserRound, labelKey: "auth.rolePatient" },
+  { value: "PHARMACY", icon: Building2, labelKey: "auth.rolePharmacy" },
+] as const;
+
+/**
+ * 0–4 strength score.
+ *
+ * Length alone used to be scored, then labelled with composition advice
+ * ("add numbers & symbols") that the score was not actually checking. This
+ * measures what it claims to.
+ */
+function scorePassword(value: string): { score: number; key: MessageKey } {
+  if (!value) return { score: 0, key: "auth.weak" };
+  let score = 0;
+  if (value.length >= 8) score++;
+  if (value.length >= 12) score++;
+  if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score++;
+  if (/\d/.test(value)) score++;
+  if (/[^A-Za-z0-9]/.test(value)) score++;
+  // One point for a character class keeps a bare "aaaaaaaa" at the bottom.
+  if (/[a-z]/.test(value) || /[A-Z]/.test(value) || /\d/.test(value)) score++;
+
+  const capped = Math.min(4, score);
+  const keys: MessageKey[] = ["auth.weak", "auth.weak", "auth.fair", "auth.good", "auth.strong"];
+  return { score: capped, key: keys[capped] ?? "auth.weak" };
+}
+
+const STRENGTH_TONE = ["danger", "danger", "warning", "accent", "success"] as const;
+
+function RegisterInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLocale();
-  const [role, setRole] = useState<"PATIENT" | "PHARMACY">("PATIENT");
   const [showPassword, setShowPassword] = useState(false);
 
   const {
@@ -35,21 +67,19 @@ export default function RegisterPage() {
   const currentRole = watch("role");
   const watchedLat = watch("latitude");
   const watchedLng = watch("longitude");
-  const pickedLocation =
-    typeof watchedLat === "number" &&
-    typeof watchedLng === "number" &&
-    !Number.isNaN(watchedLat) &&
-    !Number.isNaN(watchedLng)
-      ? { lat: watchedLat, lng: watchedLng }
-      : null;
-
-  function selectRole(r: "PATIENT" | "PHARMACY") {
-    setRole(r);
-    setValue("role", r);
-  }
-
   const passwordValue = watch("password") || "";
-  const passwordStrength = passwordValue.length === 0 ? 0 : passwordValue.length < 6 ? 1 : passwordValue.length < 10 ? 2 : 3;
+  const next = searchParams.get("next");
+
+  const pickedLocation = useMemo(
+    () =>
+      typeof watchedLat === "number" && typeof watchedLng === "number" &&
+      Number.isFinite(watchedLat) && Number.isFinite(watchedLng)
+        ? { lat: watchedLat, lng: watchedLng }
+        : null,
+    [watchedLat, watchedLng]
+  );
+
+  const strength = scorePassword(passwordValue);
 
   const onSubmit = async (values: RegisterInput) => {
     try {
@@ -59,152 +89,181 @@ export default function RegisterPage() {
         body: JSON.stringify(values),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Registration failed");
-      }
-      toast.success(data.message || "Account created! Check your email to verify.");
-      router.push("/login?registered=1");
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+      if (!res.ok) throw new Error(data.error || t("common.error"));
+      toast.success(data.message || t("auth.registeredToast"));
+      router.push(next ? `/login?registered=1&next=${encodeURIComponent(next)}` : "/login?registered=1");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     }
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center relative overflow-hidden py-12">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary-400/15 rounded-full blur-[150px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-sky-400/10 rounded-full blur-[150px]" />
-      </div>
+    <AuthShell
+      showAside
+      icon={UserPlus}
+      title={t("auth.registerTitle")}
+      subtitle={t("auth.registerSubtitle")}
+      footer={
+        <>
+          {t("auth.noAccountYet")}{" "}
+          <Link
+            href="/login"
+            className="rounded font-semibold text-accent transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+          >
+            {t("auth.signIn")}
+          </Link>
+        </>
+      }
+    >
+      {/* Role picker — a real segmented control, not two ad-hoc buttons. */}
+      <fieldset className="mb-6">
+        <legend className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.12em] text-fg-subtle">
+          {t("auth.iAm")}
+        </legend>
+        <div className="grid grid-cols-2 gap-2">
+          {ROLES.map(({ value, icon: Icon, labelKey }) => {
+            const active = currentRole === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setValue("role", value, { shouldValidate: true })}
+                aria-pressed={active}
+                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold ring-1 ring-inset transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring ${
+                  active
+                    ? "bg-accent text-accent-fg ring-accent"
+                    : "bg-surface text-fg-muted ring-line hover:bg-surface-sunken hover:text-fg"
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {t(labelKey)}
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
 
-      <div className="relative w-full max-w-lg mx-auto px-4 animate-fadeIn">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-b from-primary-500 to-primary-600 text-white rounded-2xl shadow-[0_12px_32px_-8px_rgb(39_150_129/0.55)] ring-1 ring-inset ring-white/25 mb-4">
-            <Stethoscope className="h-8 w-8" />
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <input type="hidden" {...register("role")} />
+
+        <Input
+          label={t("auth.fullName")}
+          autoComplete="name"
+          error={errors.name?.message}
+          {...register("name")}
+        />
+        <Input
+          label={t("auth.email")}
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          error={errors.email?.message}
+          {...register("email")}
+        />
+
+        <div className="space-y-2">
+          <label htmlFor="register-password" className="block text-sm font-medium text-fg">
+            {t("auth.password")}
+          </label>
+          <PasswordField
+            id="register-password"
+            autoComplete="new-password"
+            show={showPassword}
+            onToggle={() => setShowPassword((v) => !v)}
+            showLabel={t("auth.showPassword")}
+            hideLabel={t("auth.hidePassword")}
+            aria-invalid={errors.password ? true : undefined}
+            className="h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-fg shadow-xs transition-[box-shadow,border-color] duration-200 placeholder:text-fg-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-ring"
+            {...register("password")}
+          />
+          {errors.password?.message && (
+            <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
+              {errors.password.message}
+            </p>
+          )}
+          {/* Announced, not aria-hidden: strength guidance is useful to everyone. */}
+          <div aria-live="polite">
+            <Progress
+              value={(strength.score / 4) * 100}
+              tone={passwordValue ? STRENGTH_TONE[strength.score] : "accent"}
+              label={passwordValue ? t("auth.showStrength") : undefined}
+              showValue={false}
+            />
+            <p className="mt-1.5 flex items-center justify-between gap-3 text-xs text-fg-muted">
+              <span>{passwordValue ? t(strength.key) : ""}</span>
+              <span>{passwordValue ? t("auth.strengthHint") : ""}</span>
+            </p>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("auth.registerTitle")}</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">{t("auth.registerSubtitle")}</p>
         </div>
 
-        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-2xl shadow-card ring-1 ring-slate-200/80 dark:ring-slate-800 p-8">
-          <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 text-center">{t("auth.iAm")}</p>
-          <div className="flex gap-3 mb-8">
-            <button
-              type="button"
-              onClick={() => selectRole("PATIENT")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold ring-1 ring-inset transition-all duration-200",
-                currentRole === "PATIENT"
-                  ? "bg-slate-900 text-white ring-slate-900 dark:bg-white dark:text-slate-900 dark:ring-white shadow-md"
-                  : "ring-slate-200 dark:ring-slate-700 text-slate-600 dark:text-slate-400 hover:ring-primary-300 dark:hover:ring-primary-700 bg-white dark:bg-slate-900"
-              )}
+        <AnimatePresence initial={false}>
+          {currentRole === "PHARMACY" && (
+            <motion.div
+              key="pharmacy-fields"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden"
             >
-              <UserRound className="h-5 w-5" />
-              {t("auth.rolePatient")}
-            </button>
-            <button
-              type="button"
-              onClick={() => selectRole("PHARMACY")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold ring-1 ring-inset transition-all duration-200",
-                currentRole === "PHARMACY"
-                  ? "bg-slate-900 text-white ring-slate-900 dark:bg-white dark:text-slate-900 dark:ring-white shadow-md"
-                  : "ring-slate-200 dark:ring-slate-700 text-slate-600 dark:text-slate-400 hover:ring-primary-300 dark:hover:ring-primary-700 bg-white dark:bg-slate-900"
-              )}
-            >
-              <Building2 className="h-5 w-5" />
-              {t("auth.rolePharmacy")}
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <input type="hidden" {...register("role")} value={currentRole} />
-
-            <Input label={t("auth.fullName")} placeholder="Ram Sharma" autoComplete="name" {...register("name")} error={errors.name?.message} />
-            <Input label={t("auth.email")} type="email" placeholder="you@example.com" autoComplete="email" {...register("email")} error={errors.email?.message} />
-            <div className="space-y-1.5">
-              <div className="relative">
-                <Input
-                  label={t("auth.password")}
-                  type={showPassword ? "text" : "password"}
-                  placeholder="At least 6 characters"
-                  autoComplete="new-password"
-                  {...register("password")}
-                  error={errors.password?.message}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-[2.1rem] p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
-                  aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {passwordValue && (
-                <div className="flex gap-1" aria-hidden="true">
-                  {[1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className={`h-1 flex-1 rounded-full transition-colors ${i <= passwordStrength ? (passwordStrength === 1 ? "bg-red-500" : passwordStrength === 2 ? "bg-amber-500" : "bg-emerald-500") : "bg-slate-200 dark:bg-slate-700"}`}
-                    />
-                  ))}
-                </div>
-              )}
-              {passwordValue && (
-                <p className="text-xs text-slate-500">
-                  {passwordStrength === 1 ? "Weak — use 6+ characters" : passwordStrength === 2 ? "Medium — add numbers & symbols" : "Strong password"}
+              <div className="space-y-4 border-t border-line pt-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-fg-subtle">
+                  {t("auth.pharmacyDetails")}
                 </p>
-              )}
-            </div>
+                <Input
+                  label={t("auth.pharmacyName")}
+                  autoComplete="organization"
+                  error={errors.pharmacyName?.message}
+                  {...register("pharmacyName")}
+                />
+                <Input
+                  label={t("auth.address")}
+                  autoComplete="street-address"
+                  error={errors.address?.message}
+                  {...register("address")}
+                />
+                <Input
+                  label={t("auth.phone")}
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="01-4XXXXXX"
+                  error={errors.phone?.message}
+                  {...register("phone")}
+                />
+                <Input
+                  label={`${t("auth.licenseNumber")} · ${t("auth.optional")}`}
+                  hint={t("auth.licenseHint")}
+                  error={errors.licenseNumber?.message}
+                  {...register("licenseNumber")}
+                />
+                <GoogleMapPicker
+                  value={pickedLocation}
+                  onChange={(pos) => {
+                    setValue("latitude", pos.lat, { shouldValidate: true });
+                    setValue("longitude", pos.lng, { shouldValidate: true });
+                  }}
+                  error={errors.latitude?.message ?? errors.longitude?.message}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            <AnimatePresence mode="wait">
-              {currentRole === "PHARMACY" && (
-                <motion.div
-                  key="pharmacy-fields"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4 overflow-hidden"
-                >
-                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">{t("auth.rolePharmacy")}</p>
-                    <div className="space-y-4">
-                      <Input label={t("auth.pharmacyName")} placeholder="Nepal Life Pharmacy" {...register("pharmacyName")} error={errors.pharmacyName?.message} />
-                      <Input label={t("auth.address")} placeholder="New Road, Kathmandu" {...register("address")} error={errors.address?.message} />
-                      <Input label={t("auth.phone")} placeholder="01-4223344" {...register("phone")} error={errors.phone?.message} />
-                      <Input label={`${t("auth.licenseNumber")} (optional)`} placeholder="PH-KTM-001" {...register("licenseNumber")} error={errors.licenseNumber?.message} />
-                      <div>
-                        <GoogleMapPicker
-                          value={pickedLocation}
-                          onChange={(pos) => {
-                            setValue("latitude", pos.lat, { shouldValidate: true });
-                            setValue("longitude", pos.lng, { shouldValidate: true });
-                          }}
-                          error={errors.latitude?.message ?? errors.longitude?.message}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+        <Button type="submit" block loading={isSubmitting} className="mt-1">
+          <Check className="h-4 w-4" aria-hidden="true" />
+          {currentRole === "PHARMACY" ? t("auth.registerPharmacy") : t("auth.registerPatient")}
+        </Button>
+      </form>
+    </AuthShell>
+  );
+}
 
-            <Button type="submit" loading={isSubmitting} className="w-full mt-2">
-              <Check className="h-4 w-4" />
-              {t("auth.createOne")}
-            </Button>
-          </form>
-
-          <p className="text-sm text-slate-500 mt-6 text-center">
-            {t("auth.noAccountYet")}{" "}
-            <Link href="/login" className="text-primary-600 font-semibold hover:text-primary-700 transition-colors">
-              {t("auth.signIn")}
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[60vh] bg-canvas" />}>
+      <RegisterInner />
+    </Suspense>
   );
 }

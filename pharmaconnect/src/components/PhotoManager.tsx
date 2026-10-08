@@ -6,6 +6,7 @@ import { useSession } from "@/components/Providers";
 import { appToast as toast } from "@/components/Providers";
 import { Camera, ImagePlus, Trash2, ExternalLink, Loader2, Upload } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { useLocale } from "@/components/LocaleProvider";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import type { PharmacyImageDTO } from "@/types";
@@ -117,12 +118,12 @@ export default function PhotoManager() {
       <div className="flex items-start justify-between gap-3 mb-1">
         <div>
           <h2 className="font-display font-semibold text-lg flex items-center gap-2">
-            <span className="p-1.5 bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300 rounded-xl">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent">
               <Camera className="h-4 w-4" />
             </span>
             Pharmacy photos
           </h2>
-          <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+          <p className="mt-1.5 text-xs leading-relaxed text-fg-muted">
             Patients see these on search cards and your storefront. JPG / PNG / WebP, max 5 MB each.
           </p>
         </div>
@@ -131,7 +132,7 @@ export default function PhotoManager() {
             href={`/pharmacies/${pharmacyId}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 dark:text-primary-300 hover:underline underline-offset-4 shrink-0 mt-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/30"
+            className="inline-flex items-center gap-1 shrink-0 rounded text-xs font-semibold text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
           >
             <ExternalLink className="h-3.5 w-3.5" /> View storefront
           </a>
@@ -153,7 +154,7 @@ export default function PhotoManager() {
               <div key={slot.kind} className="space-y-2 min-w-0">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="text-sm font-semibold">{slot.title}</p>
-                  <span className="text-[11px] font-medium text-stone-400">{slot.acceptNote}</span>
+                  <span className="text-[11px] font-medium text-fg-subtle">{slot.acceptNote}</span>
                 </div>
                 <button
                   type="button"
@@ -171,11 +172,11 @@ export default function PhotoManager() {
                     if (f) upload(slot.kind, f);
                   }}
                   className={cn(
-                    "group relative block w-full overflow-hidden rounded-2xl bg-stone-100 dark:bg-slate-800 border border-dashed transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary-500/20",
+                    "group relative block w-full overflow-hidden rounded-2xl bg-surface-sunken border border-dashed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring",
                     slot.aspect,
                     isDragOver
-                      ? "border-primary-500 bg-primary-50 dark:bg-primary-500/10"
-                      : "border-stone-300 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-500",
+                      ? "border-accent bg-accent-soft"
+                      : "border-line-strong hover:border-accent",
                     !url && "min-h-[7rem]"
                   )}
                   aria-label={url ? `Replace ${slot.title}` : `Upload ${slot.title}`}
@@ -189,7 +190,7 @@ export default function PhotoManager() {
                       sizes={slot.kind === "PROFILE" ? "176px" : "560px"}
                     />
                   ) : (
-                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-stone-400">
+                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-fg-subtle">
                       <ImagePlus className="h-6 w-6" aria-hidden="true" />
                       <span className="text-[11px] font-semibold inline-flex items-center gap-1">
                         <Upload className="h-3 w-3" /> Drop or click to upload
@@ -199,18 +200,18 @@ export default function PhotoManager() {
                   {/* Hover affordance when image exists */}
                   {url && !isBusy && (
                     <span className="absolute inset-0 bg-slate-950/0 group-hover:bg-slate-950/35 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      <span className="text-xs font-semibold text-white bg-slate-950/60 px-3 py-1.5 rounded-full">
+                      <span className="rounded-full bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-white">
                         Replace
                       </span>
                     </span>
                   )}
                   {isBusy && (
-                    <span className="absolute inset-0 bg-slate-900/40 flex items-center justify-center">
+                    <span className="absolute inset-0 flex items-center justify-center bg-slate-900/40">
                       <Loader2 className="h-5 w-5 text-white animate-spin" />
                     </span>
                   )}
                 </button>
-                <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{slot.hint}</p>
+                <p className="text-[11px] leading-relaxed text-fg-muted">{slot.hint}</p>
                 <input
                   ref={(el) => {
                     fileRefs.current[slot.kind] = el;

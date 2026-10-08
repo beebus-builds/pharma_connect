@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
 import { appToast as toast } from "@/components/Providers";
-import { Search, X, History, Pill, Trash2 } from "lucide-react";
+import { Search, X, History, Pill, Trash2, CornerDownLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/components/LocaleProvider";
 import type { MedicineDTO } from "@/types";
@@ -13,9 +13,12 @@ interface SearchBarProps {
   selected?: MedicineDTO | null;
   /** Pre-fills the input (e.g. from a `?q=` deep link). Does not auto-select. */
   initialQuery?: string;
+  /** Hint shown under the field when nothing is selected yet. */
+  footer?: ReactNode;
 }
 
 const RECENT_SEARCHES_KEY = "pharmaconnect_recent_searches";
+const MAX_RECENT = 6;
 
 function Highlight({ text, query }: { text: string; query: string }) {
   if (!query) return <>{text}</>;
@@ -24,7 +27,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
   return (
     <>
       {text.slice(0, idx)}
-      <mark className="bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 px-0.5 rounded">
+      <mark className="rounded bg-accent-soft px-0.5 text-accent">
         {text.slice(idx, idx + query.length)}
       </mark>
       {text.slice(idx + query.length)}
@@ -32,7 +35,36 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
-export default function SearchBar({ onSelect, onClear, selected, initialQuery }: SearchBarProps) {
+/** Thumbnail: real product photo when the catalog has one, monogram otherwise. */
+function Thumb({ medicine, active }: { medicine: MedicineDTO; active: boolean }) {
+  if (medicine.imageUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={medicine.imageUrl}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="h-10 w-10 shrink-0 rounded-lg object-cover ring-1 ring-line"
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold ring-1 ring-inset transition-colors",
+        active
+          ? "bg-accent text-accent-fg ring-accent"
+          : "bg-surface-sunken text-fg-subtle ring-line"
+      )}
+    >
+      {medicine.genericName.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+
+export default function SearchBar({ onSelect, onClear, selected, initialQuery, footer }: SearchBarProps) {
   const { t } = useLocale();
   const [query, setQuery] = useState(initialQuery ?? "");
   const [suggestions, setSuggestions] = useState<MedicineDTO[]>([]);
@@ -91,6 +123,22 @@ export default function SearchBar({ onSelect, onClear, selected, initialQuery }:
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // `/` focuses the search from anywhere on the page — the convention people
+  // already carry over from every other search-first product.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (target?.isContentEditable) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+      setOpen(true);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   useEffect(() => {
     setNextCursor(null);
     setHasMore(false);
@@ -118,15 +166,15 @@ export default function SearchBar({ onSelect, onClear, selected, initialQuery }:
           setActiveIndex(-1);
           setOpen(true);
         }
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name !== "AbortError") {
           setSuggestions([]);
           toast.error(err.message || tRef.current("search.searchFailed"));
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
-    }, 280);
+    }, 240);
 
     return () => {
       clearTimeout(timer);
@@ -146,12 +194,19 @@ export default function SearchBar({ onSelect, onClear, selected, initialQuery }:
       if (queryRef.current !== requestedQuery) return;
       setSuggestions((previous) => {
         const existing = new Set(previous.map((medicine) => medicine.id));
-        return [...previous, ...(data.medicines ?? []).filter((medicine: MedicineDTO) => !existing.has(medicine.id))];
+        return [
+          ...previous,
+          ...(data.medicines ?? []).filter(
+            (medicine: MedicineDTO) => !existing.has(medicine.id)
+          ),
+        ];
       });
       setNextCursor(data.pagination?.nextCursor ?? null);
       setHasMore(Boolean(data.pagination?.hasMore));
-    } catch (err: any) {
-      toast.error(err.message || tRef.current("search.loadMoreFailed"));
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : tRef.current("search.loadMoreFailed")
+      );
     } finally {
       setLoadingMore(false);
     }
@@ -159,26 +214,41 @@ export default function SearchBar({ onSelect, onClear, selected, initialQuery }:
 
   const handleSelect = useCallback(
     (medicine: MedicineDTO) => {
-      const updatedRecent = [medicine, ...recentSearches.filter((m) => m.id !== medicine.id)].slice(0, 5);
+      const updatedRecent = [
+        medicine,
+        ...recentSearches.filter((m) => m.id !== medicine.id),
+      ].slice(0, MAX_RECENT);
       setRecentSearches(updatedRecent);
-      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updatedRecent));
+      try {
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updatedRecent));
+      } catch {
+        // private mode: recents are a nicety, not a requirement
+      }
       onSelect(medicine);
       setOpen(false);
       setActiveIndex(-1);
+      inputRef.current?.blur();
     },
     [onSelect, recentSearches]
   );
 
   const clearRecent = () => {
     setRecentSearches([]);
-    localStorage.removeItem(RECENT_SEARCHES_KEY);
+    try {
+      localStorage.removeItem(RECENT_SEARCHES_KEY);
+    } catch {
+      // ignore
+    }
   };
 
+  const selectedQuery = selected ? `${selected.genericName} (${selected.brandName})` : null;
   const isShowingSuggestions = query.length > 0 && suggestions.length > 0;
-  const isShowingRecent = !loading && !isShowingSuggestions && recentSearches.length > 0 && query.length === 0;
+  const isShowingRecent =
+    !loading && !isShowingSuggestions && recentSearches.length > 0 && query.length === 0;
   const listItems = isShowingSuggestions ? suggestions : isShowingRecent ? recentSearches : [];
   const listId = "search-listbox";
-  const activeId = activeIndex >= 0 ? `search-option-${listItems[activeIndex]?.id ?? activeIndex}` : undefined;
+  const activeId =
+    activeIndex >= 0 ? `search-option-${listItems[activeIndex]?.id ?? activeIndex}` : undefined;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!open) {
@@ -204,6 +274,8 @@ export default function SearchBar({ onSelect, onClear, selected, initialQuery }:
       setOpen(false);
       setActiveIndex(-1);
       inputRef.current?.blur();
+    } else if (e.key === "Tab") {
+      setOpen(false);
     }
   };
 
@@ -214,194 +286,218 @@ export default function SearchBar({ onSelect, onClear, selected, initialQuery }:
     }
   }, [activeIndex]);
 
+  const panelOpen = open && (loading || isShowingSuggestions || isShowingRecent || query.length > 0);
+
   return (
     <div ref={containerRef} className="relative w-full">
-      <div className="relative group">
+      <div className="relative">
         <Search
-          className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary-600 transition-colors pointer-events-none"
+          className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-fg-subtle transition-colors peer-focus:text-accent"
           aria-hidden="true"
         />
         <input
           ref={inputRef}
           value={query}
-           onChange={(e) => {
-             queryRef.current = e.target.value;
-             setQuery(e.target.value);
-            if (onClear) onClear();
+          onChange={(e) => {
+            queryRef.current = e.target.value;
+            setQuery(e.target.value);
+            onClear?.();
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={t("search.placeholder")}
-          className="w-full pl-12 pr-12 py-4 rounded-2xl border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm shadow-sm focus:outline-none focus:ring-4 focus:ring-primary-500/15 focus:border-primary-500 transition-all duration-200 placeholder:text-slate-400"
+          className={cn(
+            "peer h-14 w-full rounded-2xl border border-line bg-surface pl-12 text-[0.9375rem] text-fg shadow-card",
+            "placeholder:text-fg-subtle",
+            "focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/15",
+            "transition-[box-shadow,border-color] duration-200 motion-reduce:transition-none",
+            query ? "pr-24" : "pr-20"
+          )}
           role="combobox"
-          aria-expanded={open}
+          aria-expanded={panelOpen}
           aria-controls={listId}
           aria-activedescendant={activeId}
           aria-autocomplete="list"
           aria-label={t("search.label")}
           autoComplete="off"
           spellCheck={false}
+          enterKeyHint="search"
         />
-        {query && (
-          <button
-            type="button"
-             onClick={() => {
-               queryRef.current = "";
-               setQuery("");
-              setSuggestions([]);
-              setActiveIndex(-1);
-              onClear?.();
-              inputRef.current?.focus();
-            }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
-            aria-label={t("search.clear")}
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
+
+        <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
+          {loading && (
+            <Loader2
+              className="h-4 w-4 animate-spin text-fg-subtle"
+              aria-hidden="true"
+            />
+          )}
+          {query ? (
+            <button
+              type="button"
+              onClick={() => {
+                queryRef.current = "";
+                setQuery("");
+                setSuggestions([]);
+                setActiveIndex(-1);
+                onClear?.();
+                inputRef.current?.focus();
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-subtle transition-colors hover:bg-surface-sunken hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+              aria-label={t("search.clear")}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : (
+            // Keyboard affordance, hidden on touch where there is no "/" key.
+            <kbd className="hidden select-none rounded-md border border-line bg-surface-sunken px-1.5 py-0.5 font-sans text-[10px] font-semibold text-fg-subtle sm:block">
+              /
+            </kbd>
+          )}
+        </div>
       </div>
 
-        {open && (
-          <div
-            className="absolute z-50 mt-2 w-full rounded-2xl border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-popover overflow-hidden max-h-[460px] flex flex-col animate-slideUp motion-reduce:animate-none"
-            role="region"
-            aria-label={t("search.suggestions")}
-          >
-            {loading && (
-              <div className="px-4 py-4 text-sm text-slate-500 flex items-center gap-3">
-                <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-                <span aria-live="polite">{t("search.searching")}</span>
-              </div>
-            )}
+      {panelOpen && (
+        <div
+          className="absolute z-50 mt-2 w-full origin-top overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay animate-scaleIn motion-reduce:animate-none"
+          role="region"
+          aria-label={t("search.suggestions")}
+        >
+          {loading && !isShowingSuggestions && (
+            <div className="flex items-center gap-2.5 px-4 py-3 text-sm text-fg-muted" aria-live="polite">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              {t("search.searching")}
+            </div>
+          )}
 
-            {!loading && !isShowingSuggestions && !isShowingRecent && (
-              <div className="px-4 py-8 text-center">
-                <Pill className="h-8 w-8 text-slate-300 mx-auto mb-2" aria-hidden="true" />
-                <p className="text-sm text-slate-500">
-                  {query ? t("search.noResults", { query }) : t("search.empty")}
-                </p>
-              </div>
-            )}
+          {!loading && !isShowingSuggestions && !isShowingRecent && (
+            <div className="px-4 py-10 text-center">
+              <Pill className="mx-auto mb-2.5 h-7 w-7 text-fg-subtle" aria-hidden="true" />
+              <p className="text-sm text-fg-muted">
+                {query ? t("search.noResults", { query }) : t("search.empty")}
+              </p>
+            </div>
+          )}
 
-            {!loading && isShowingRecent && (
-              <div className="py-2" ref={listRef}>
-                <div className="px-4 py-2 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("search.recent")}</span>
+          {!loading && isShowingRecent && (
+            <div className="py-2" ref={listRef}>
+              <div className="flex items-center justify-between px-4 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-fg-subtle">
+                  {t("search.recent")}
+                </span>
+                <button
+                  onClick={clearRecent}
+                  className="inline-flex items-center gap-1 rounded px-1 text-[10px] font-semibold text-fg-subtle transition-colors hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
+                  aria-label={t("search.clearRecentAria")}
+                >
+                  <Trash2 className="h-3 w-3" aria-hidden="true" />
+                  {t("search.clear")}
+                </button>
+              </div>
+              <div
+                className="max-h-64 overflow-y-auto"
+                id={listId}
+                role="listbox"
+                aria-label={t("search.recentList")}
+              >
+                {recentSearches.map((m, idx) => (
                   <button
-                    onClick={clearRecent}
-                    className="text-[10px] font-semibold text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/20 rounded px-1"
-                    aria-label={t("search.clearRecentAria")}
+                    key={`recent-${m.id}`}
+                    data-index={idx}
+                    id={`search-option-${m.id}`}
+                    role="option"
+                    aria-selected={idx === activeIndex}
+                    onClick={() => handleSelect(m)}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors focus-visible:outline-none",
+                      idx === activeIndex ? "bg-accent-soft" : "hover:bg-surface-sunken"
+                    )}
                   >
-                    <Trash2 className="h-3 w-3" /> {t("search.clear")}
-                  </button>
-                </div>
-                <div className="max-h-40 overflow-y-auto" id={listId} role="listbox" aria-label={t("search.recentList")}>
-                  {recentSearches.map((m, idx) => (
-                    <button
-                      key={`recent-${m.id}`}
-                      data-index={idx}
-                      id={`search-option-${m.id}`}
-                      role="option"
-                      aria-selected={idx === activeIndex}
-                      onClick={() => handleSelect(m)}
-                      onMouseEnter={() => setActiveIndex(idx)}
-                      className={cn(
-                        "w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors group focus-visible:outline-none",
-                        idx === activeIndex
-                          ? "bg-primary-50 dark:bg-slate-700 text-primary-700 dark:text-white"
-                          : "hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                      )}
-                    >
-                      {m.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={m.imageUrl}
-                          alt={m.genericName}
-                          loading="lazy"
-                          className="h-9 w-9 rounded-lg object-cover shrink-0 ring-1 ring-stone-200 dark:ring-slate-700"
-                        />
-                      ) : (
-                        <History className="h-4 w-4 text-slate-400 group-hover:text-primary-600 shrink-0" aria-hidden="true" />
-                      )}
-                      <span className="text-sm truncate">
-                        <span className="font-medium">{m.genericName}</span>
-                        <span className="text-slate-500 text-xs ml-1.5">{m.brandName} · {m.strength}</span>
+                    <History
+                      className="h-4 w-4 shrink-0 text-fg-subtle"
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      <span className="font-medium text-fg">{m.genericName}</span>
+                      <span className="ml-1.5 text-xs text-fg-muted">
+                        {m.brandName} · {m.strength}
                       </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {!loading && isShowingSuggestions && (
-              <div className="py-2" ref={listRef}>
-                <div className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {t("search.matches", { count: suggestions.length, query })}
-                </div>
-                <div className="max-h-72 overflow-y-auto" id={listId} role="listbox" aria-label={t("search.suggestions")}>
-                  {suggestions.map((m, idx) => (
-                    <button
-                      key={m.id}
-                      data-index={idx}
-                      id={`search-option-${m.id}`}
-                      role="option"
-                      aria-selected={idx === activeIndex}
-                      onClick={() => handleSelect(m)}
-                      onMouseEnter={() => setActiveIndex(idx)}
-                      className={cn(
-                        "w-full text-left px-4 py-3 flex items-center justify-between transition-colors group focus-visible:outline-none focus-visible:bg-primary-50 dark:focus-visible:bg-slate-800",
-                        idx === activeIndex
-                          ? "bg-primary-50 dark:bg-slate-800"
-                          : "hover:bg-stone-50 dark:hover:bg-slate-800/60"
-                      )}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {m.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={m.imageUrl}
-                            alt={m.genericName}
-                            loading="lazy"
-                            className="h-9 w-9 rounded-lg object-cover shrink-0 ring-1 ring-stone-200 dark:ring-slate-700"
-                          />
-                        ) : (
-                          <div
-                            className={cn(
-                              "p-1.5 rounded-lg shrink-0 transition-colors",
-                              idx === activeIndex
-                                ? "bg-white dark:bg-slate-700 text-primary-600"
-                                : "bg-stone-100 dark:bg-slate-800 text-slate-500 group-hover:bg-white dark:group-hover:bg-slate-700"
-                            )}
-                            aria-hidden="true"
-                          >
-                            <Pill className="h-4 w-4" />
-                          </div>
-                        )}
-                        <span className="text-sm truncate">
-                          <span className="font-semibold text-slate-900 dark:text-white">
-                            <Highlight text={m.genericName} query={query} />
-                          </span>
-                          <span className="text-slate-500 dark:text-slate-400 ml-1.5">· {m.brandName} {m.strength}</span>
-                        </span>
-                      </div>
-                      <span className="text-xs text-slate-400 ml-2 hidden sm:inline">{m.genericName.slice(0, 1).toUpperCase()}</span>
-                    </button>
-                  ))}
-                </div>
-                {hasMore && nextCursor && (
-                  <button
-                    type="button"
-                    onClick={loadMore}
-                    disabled={loadingMore}
-                    className="w-full border-t border-slate-100 dark:border-slate-700 px-4 py-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-800 disabled:opacity-60"
-                  >
-                    {loadingMore ? t("search.loadingMore") : t("search.loadMore")}
+                    </span>
                   </button>
-                )}
+                ))}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+
+          {!loading && isShowingSuggestions && (
+            <div className="py-2" ref={listRef}>
+              <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-fg-subtle">
+                {t("search.matches", { count: suggestions.length, query })}
+              </div>
+              <div
+                className="max-h-80 overflow-y-auto"
+                id={listId}
+                role="listbox"
+                aria-label={t("search.suggestions")}
+              >
+                {suggestions.map((m, idx) => (
+                  <button
+                    key={m.id}
+                    data-index={idx}
+                    id={`search-option-${m.id}`}
+                    role="option"
+                    aria-selected={idx === activeIndex}
+                    onClick={() => handleSelect(m)}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors focus-visible:outline-none",
+                      idx === activeIndex ? "bg-accent-soft" : "hover:bg-surface-sunken"
+                    )}
+                  >
+                    <Thumb medicine={m} active={idx === activeIndex} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-fg">
+                        <Highlight text={m.genericName} query={query} />
+                        <span className="ml-1.5 font-normal text-fg-muted">
+                          {m.brandName} {m.strength}
+                        </span>
+                      </span>
+                      {m.manufacturer && (
+                        <span className="block truncate text-xs text-fg-subtle">
+                          {m.manufacturer}
+                        </span>
+                      )}
+                    </span>
+                    {idx === activeIndex && (
+                      <CornerDownLeft
+                        className="h-3.5 w-3.5 shrink-0 text-fg-subtle"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+              {hasMore && nextCursor && (
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="w-full border-t border-line px-4 py-3 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft disabled:opacity-60"
+                >
+                  {loadingMore ? t("search.loadingMore") : t("search.loadMore")}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {footer && !selected && <div className="mt-3">{footer}</div>}
+
+      {/* Screen-reader mirror of the visible field state. */}
+      <span className="sr-only" aria-live="polite">
+        {selectedQuery ? `${t("search.selected")}: ${selectedQuery}` : ""}
+      </span>
     </div>
   );
 }

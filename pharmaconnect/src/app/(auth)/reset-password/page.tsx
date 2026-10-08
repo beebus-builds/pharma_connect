@@ -2,12 +2,14 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { appToast as toast } from "@/components/Providers";
-import { LockKeyhole } from "lucide-react";
+import { Link2Off, LockKeyhole } from "lucide-react";
 import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useLocale } from "@/components/LocaleProvider";
+import { AuthShell, PasswordField } from "../AuthShell";
+import Link from "next/link";
 
 function ResetInner() {
   const router = useRouter();
@@ -16,18 +18,20 @@ function ResetInner() {
   const token = searchParams.get("token") ?? "";
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<{ password?: string; confirm?: string }>({});
 
+  // Validation runs against the field, not the toast: a toast disappears before
+  // the reader gets their eyes back to the form.
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
-      return;
-    }
-    if (password !== confirm) {
-      toast.error("Passwords don't match");
-      return;
-    }
+    const nextErrors: typeof error = {};
+    if (password.length < 6) nextErrors.password = t("auth.passwordTooShort");
+    if (password !== confirm) nextErrors.confirm = t("auth.passwordMismatch");
+    setError(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     setSaving(true);
     try {
       const res = await fetch("/api/auth/reset-password", {
@@ -36,11 +40,11 @@ function ResetInner() {
         body: JSON.stringify({ token, password }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Reset failed");
+      if (!res.ok) throw new Error(data.error || t("common.error"));
       toast.success(t("auth.passwordUpdated"));
       router.push("/login?reset=done");
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setSaving(false);
     }
@@ -48,62 +52,69 @@ function ResetInner() {
 
   if (!token) {
     return (
-      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
-        <div className="max-w-md text-center space-y-3">
-          <h1 className="text-2xl font-bold">Missing reset link</h1>
-          <p className="text-slate-500 text-sm">
-            Open the link from your email, or request a new one.
-          </p>
-          <Link href="/forgot-password" className="text-primary-600 font-semibold text-sm">
-            Request a new reset link
-          </Link>
-        </div>
-      </div>
+      <AuthShell icon={Link2Off} title={t("auth.missingToken.title")}>
+        <EmptyState
+          icon={Link2Off}
+          title={t("auth.missingToken.title")}
+          body={t("auth.missingToken.body")}
+          action={
+            <Link href="/forgot-password" className={buttonClasses()}>
+              {t("auth.missingToken.cta")}
+            </Link>
+          }
+        />
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-primary-50 dark:from-slate-950 dark:via-slate-900 dark:to-primary-950">
-      <div className="w-full max-w-md mx-auto px-4 py-12">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 text-white rounded-2xl shadow-lg mb-4">
-            <LockKeyhole className="h-8 w-8" />
-          </div>
-          <h1 className="text-3xl font-bold">{t("auth.newPassword")}</h1>
-          <p className="text-slate-500 mt-1">{t("auth.newPasswordHint")}</p>
+    <AuthShell icon={LockKeyhole} title={t("auth.newPassword")} subtitle={t("auth.newPasswordHint")}>
+      <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        <div className="space-y-1.5">
+          <label htmlFor="reset-password" className="block text-sm font-medium text-fg">
+            {t("auth.newPassword")}
+          </label>
+          <PasswordField
+            id="reset-password"
+            autoComplete="new-password"
+            placeholder="••••••••"
+            show={showPassword}
+            onToggle={() => setShowPassword((v) => !v)}
+            showLabel={t("auth.showPassword")}
+            hideLabel={t("auth.hidePassword")}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            aria-invalid={error.password ? true : undefined}
+            className="h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-fg shadow-xs transition-[box-shadow,border-color] duration-200 placeholder:text-fg-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-ring"
+          />
+          {error.password && (
+            <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
+              {error.password}
+            </p>
+          )}
         </div>
-        <div className="bg-white dark:bg-slate-800/90 rounded-2xl shadow-xl border border-slate-200/50 p-8">
-          <form onSubmit={onSubmit} className="space-y-5">
-            <Input
-              label={t("auth.newPassword")}
-              type="password"
-              required
-              minLength={6}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <Input
-              label={t("auth.confirmPassword")}
-              type="password"
-              required
-              placeholder="••••••••"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-            />
-            <Button type="submit" loading={saving} className="w-full">
-              {t("auth.updatePassword")}
-            </Button>
-          </form>
-        </div>
-      </div>
-    </div>
+
+        <Input
+          label={t("auth.confirmPassword")}
+          type={showPassword ? "text" : "password"}
+          autoComplete="new-password"
+          placeholder="••••••••"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          error={error.confirm}
+        />
+
+        <Button type="submit" block loading={saving}>
+          {t("auth.updatePassword")}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="min-h-[60vh] bg-canvas" />}>
       <ResetInner />
     </Suspense>
   );

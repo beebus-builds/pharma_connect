@@ -2,46 +2,89 @@ import { ButtonHTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "danger"
+  | "outline"
+  | "accent";
+
+export type ButtonSize = "xs" | "sm" | "md" | "lg" | "icon" | "icon-sm";
+
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "ghost" | "danger" | "outline";
-  size?: "sm" | "md" | "lg" | "icon";
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
+  /** Stretch to the width of the container. */
+  block?: boolean;
+}
+
+const variants: Record<ButtonVariant, string> = {
+  primary:
+    "bg-accent text-accent-fg hover:bg-accent-hover shadow-xs active:translate-y-px focus-visible:ring-accent-ring",
+  // Solid surface + hairline. The workhorse: reads correctly on any background.
+  secondary:
+    "bg-surface text-fg ring-1 ring-inset ring-line hover:bg-surface-sunken hover:ring-line-strong shadow-xs active:translate-y-px focus-visible:ring-accent-ring",
+  ghost:
+    "text-fg-muted hover:bg-surface-sunken hover:text-fg focus-visible:ring-accent-ring",
+  danger:
+    "bg-red-700 text-white hover:bg-red-800 shadow-xs active:translate-y-px focus-visible:ring-red-600 dark:bg-red-600 dark:hover:bg-red-500",
+  outline:
+    "bg-transparent text-fg ring-1 ring-inset ring-line-strong hover:bg-surface-sunken active:translate-y-px focus-visible:ring-accent-ring",
+  // Emphasis for the single most important action on a screen.
+  accent:
+    "bg-surface-inverse text-fg-inverse hover:opacity-90 shadow-xs active:translate-y-px focus-visible:ring-fg-muted",
+};
+
+const sizes: Record<ButtonSize, string> = {
+  // System scale: xs = dense tables, sm = chips / card actions, md = default,
+  // lg = hero + forms, icon* = square icon-only controls.
+  xs: "h-7 px-2.5 text-[11px] rounded-md gap-1",
+  sm: "h-8 px-3 text-xs rounded-lg gap-1.5",
+  md: "h-10 px-4 text-sm rounded-xl gap-2",
+  lg: "h-12 px-6 text-[0.9375rem] rounded-xl gap-2",
+  icon: "h-10 w-10 rounded-xl",
+  "icon-sm": "h-8 w-8 rounded-lg",
+};
+
+const base =
+  "inline-flex select-none items-center justify-center whitespace-nowrap font-semibold " +
+  "transition-[background-color,color,box-shadow,transform] duration-150 ease-spring " +
+  "disabled:opacity-50 disabled:pointer-events-none " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas " +
+  "motion-reduce:transition-none motion-reduce:translate-y-0";
+
+/**
+ * Class list for a `<Link>` (or `<a>`) that should look like a button.
+ *
+ * `<Link><Button/></Link>` nests an interactive control inside another one, which
+ * breaks keyboard activation and produces duplicate tab stops. This is the
+ * supported way to get button styling onto a real anchor.
+ */
+export function buttonClasses({
+  variant = "primary",
+  size = "md",
+  block,
+  className,
+}: { variant?: ButtonVariant; size?: ButtonSize; block?: boolean; className?: string } = {}) {
+  return cn(base, variants[variant], sizes[size], block && "w-full", className);
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", loading, disabled, children, ...props }, ref) => {
-    const variants = {
-      primary:
-        "bg-primary-700 hover:bg-primary-800 text-white shadow-sm active:scale-[0.99] focus-visible:ring-primary-600",
-      secondary:
-        "bg-white hover:bg-stone-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-ink dark:text-slate-100 ring-1 ring-inset ring-stone-200 dark:ring-slate-700 shadow-sm active:scale-[0.99] focus-visible:ring-primary-600",
-      ghost: "hover:bg-stone-100 dark:hover:bg-slate-800/80 text-stone-700 dark:text-slate-300 focus-visible:ring-slate-400",
-      danger: "bg-red-700 hover:bg-red-800 text-white shadow-sm active:scale-[0.99] focus-visible:ring-red-600",
-      outline:
-        "ring-1 ring-inset ring-stone-300 dark:ring-slate-600 bg-transparent hover:bg-stone-100 dark:hover:bg-slate-800 active:scale-[0.99] focus-visible:ring-primary-600",
-    };
-
-    const sizes = {
-      // System scale: sm = chips / table actions, md = default, lg = hero / forms, icon = square.
-      sm: "px-3.5 py-1.5 text-xs rounded-lg gap-1.5",
-      md: "px-5 py-2.5 text-sm rounded-xl gap-2",
-      lg: "px-6 py-3 text-sm rounded-xl gap-2",
-      icon: "p-2.5 rounded-xl",
-    };
-
+  (
+    { className, variant = "primary", size = "md", loading, disabled, block, children, ...props },
+    ref
+  ) => {
     return (
       <button
         ref={ref}
         disabled={disabled || loading}
-        className={cn(
-          "inline-flex items-center justify-center font-semibold transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-paper dark:focus-visible:ring-offset-slate-950 motion-reduce:transition-none motion-reduce:active:scale-100",
-          variants[variant],
-          sizes[size],
-          className
-        )}
+        aria-busy={loading || undefined}
+        className={buttonClasses({ variant, size, block, className })}
         {...props}
       >
-        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+        {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />}
         {children}
       </button>
     );

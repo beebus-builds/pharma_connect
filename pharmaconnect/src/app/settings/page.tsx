@@ -1,35 +1,54 @@
 "use client";
 
-import { useSession } from "@/components/Providers";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { User, Lock, Mail, Save, ShieldCheck } from "lucide-react";
+import { useSession, appToast as toast } from "@/components/Providers";
+import { useRouter } from "next/navigation";
+import { User, Lock, Mail, Save, Languages, Moon, Sun, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { appToast as toast } from "@/components/Providers";
+import { Container } from "@/components/ui/Container";
+import { SectionHeading } from "@/components/ui/SectionHeading";
+import { useLocale } from "@/components/LocaleProvider";
+import { useTheme } from "@/components/ThemeProvider";
+import { useLiteMode } from "@/hooks/useLiteMode";
+import { LOCALES, type Locale } from "@/lib/i18n";
 
 export default function SettingsPage() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
+  const { t, locale, setLocale } = useLocale();
+  const { theme, toggleTheme } = useTheme();
+  const { lite, ready: liteReady, setMode: setLiteMode } = useLiteMode();
   const router = useRouter();
+
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<{ password?: string; confirm?: string }>({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
-    if (session?.user) {
-      setName(session.user.name ?? "");
-    }
-  }, [status, router, session]);
+    if (status === "unauthenticated") router.replace("/login");
+  }, [status, router]);
 
-  async function handleUpdate() {
-    setLoading(true);
+  useEffect(() => {
+    if (session?.user) setName(session.user.name ?? "");
+  }, [session]);
+
+  const passwordDirty = password.length > 0;
+  const mismatch = passwordDirty && password !== confirmPassword;
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    const nextErrors: typeof error = {};
+    if (password && password.length < 6) nextErrors.password = t("auth.passwordTooShort");
+    if (mismatch) nextErrors.confirm = t("auth.passwordMismatch");
+    setError(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    setSaving(true);
     try {
-      const updates: any = { name };
+      const updates: Record<string, string> = { name };
       if (password) updates.password = password;
 
       const res = await fetch("/api/user/update", {
@@ -37,101 +56,179 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
-
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update settings");
+      if (!res.ok) throw new Error(data.error || t("common.error"));
 
-      toast.success("Settings updated successfully");
+      // Refresh the session so the navbar avatar picks up the new name.
+      await update();
+      toast.success(t("settings.saved"));
       setPassword("");
       setConfirmPassword("");
-    } catch (e: any) {
-      toast.error(e.message || "Something went wrong");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : t("common.error"));
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
   if (status === "loading" || !session) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-      </div>
+      <Container className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-accent" aria-hidden="true" />
+        <span className="sr-only">{t("common.loading")}</span>
+      </Container>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10 animate-fadeIn">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-slate-500 mt-1">Update your personal information and security</p>
-      </div>
+    <Container className="max-w-3xl py-8 sm:py-10">
+      <SectionHeading
+        eyebrow={t("settings.eyebrow")}
+        title={t("settings.title")}
+        description={t("settings.subtitle")}
+        className="mb-7"
+      />
 
-      <div className="space-y-6">
-        <Card className="p-6">
-          <h3 className="font-semibold mb-4 flex items-center gap-2">
-            <div className="p-1.5 bg-primary-100 dark:bg-primary-900/40 text-primary-600 rounded-lg">
-              <User className="h-4 w-4" />
-            </div>
-            Personal Information
-          </h3>
-          <div className="space-y-4">
+      {/* One real <form>, so Enter submits and native validation runs. */}
+      <form onSubmit={handleUpdate} className="space-y-5" noValidate>
+        <Card className="p-5 sm:p-6">
+          <CardTitle icon={User} title={t("settings.personal")} />
+          <div className="mt-5 space-y-4">
             <Input
-              label="Full Name"
+              label={t("auth.fullName")}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Your full name"
+              placeholder={t("settings.namePlaceholder")}
+              autoComplete="name"
+              required
             />
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
-              <div className="flex items-center gap-2 p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-                <Mail className="h-4 w-4 text-slate-400" />
-                <span className="text-sm font-medium text-slate-500">{session.user.email}</span>
+            <div className="space-y-1.5">
+              <span className="block text-sm font-medium text-fg">{t("auth.email")}</span>
+              <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface-sunken px-3.5 py-2.5">
+                <Mail className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
+                <span className="truncate text-sm text-fg-muted">{session.user.email}</span>
               </div>
-              <p className="text-xs text-slate-400 mt-1">Email cannot be changed.</p>
+              <p className="text-xs text-fg-subtle">{t("settings.emailLocked")}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <h3 className="font-semibold mb-4 flex items-center gap-2">
-            <div className="p-1.5 bg-primary-100 dark:bg-primary-900/40 text-primary-600 rounded-lg">
-              <Lock className="h-4 w-4" />
-            </div>
-            Security
-          </h3>
-          <div className="space-y-4">
+        <Card className="p-5 sm:p-6">
+          <CardTitle icon={Lock} title={t("settings.security")} />
+          <p className="mt-1.5 text-sm text-fg-muted">{t("settings.securityBody")}</p>
+          <div className="mt-5 space-y-4">
             <Input
-              label="New Password"
+              label={t("settings.newPassword")}
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter new password"
+              placeholder={t("settings.passwordPlaceholder")}
+              hint={password ? undefined : t("settings.passwordHint")}
+              error={error.password}
             />
             <Input
-              label="Confirm New Password"
+              label={t("settings.confirmPassword")}
               type="password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
+              placeholder={t("settings.passwordPlaceholder")}
+              error={mismatch ? t("auth.passwordMismatch") : error.confirm}
             />
-            {password && password !== confirmPassword && (
-              <p className="text-xs text-red-500 font-medium">Passwords do not match</p>
-            )}
+          </div>
+        </Card>
+
+        <Card className="p-5 sm:p-6">
+          <CardTitle icon={Languages} title={t("settings.appearance")} />
+          <div className="mt-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-fg">{t("settings.language")}</p>
+                <p className="mt-0.5 text-xs text-fg-muted">{t("settings.languageBody")}</p>
+              </div>
+              <div
+                className="flex shrink-0 rounded-xl border border-line bg-surface-sunken p-0.5"
+                role="group"
+                aria-label={t("settings.language")}
+              >
+                {LOCALES.map((code: Locale) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setLocale(code)}
+                    aria-pressed={locale === code}
+                    className={`rounded-[0.625rem] px-3.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring ${
+                      locale === code
+                        ? "bg-surface text-fg shadow-card"
+                        : "text-fg-muted hover:text-fg"
+                    }`}
+                  >
+                    {code === "en" ? "English" : "नेपाली"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-fg">{t("settings.theme")}</p>
+                <p className="mt-0.5 text-xs text-fg-muted">{t("settings.themeBody")}</p>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={toggleTheme}
+                aria-label={theme === "dark" ? t("nav.themeLight") : t("nav.themeDark")}
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Moon className="h-4 w-4" aria-hidden="true" />
+                )}
+                {theme === "dark" ? t("nav.themeLight") : t("nav.themeDark")}
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-fg">{t("settings.liteMode")}</p>
+                <p className="mt-0.5 text-xs text-fg-muted">{t("settings.liteModeBody")}</p>
+              </div>
+              <Button
+                type="button"
+                variant={lite ? "primary" : "secondary"}
+                size="sm"
+                disabled={!liteReady}
+                onClick={() => setLiteMode(!lite)}
+                aria-pressed={lite}
+              >
+                {lite ? t("nav.liteModeOff") : t("nav.liteModeOn")}
+              </Button>
+            </div>
           </div>
         </Card>
 
         <div className="flex justify-end">
-          <Button
-            loading={loading}
-            onClick={handleUpdate}
-            disabled={!!(password && password !== confirmPassword)}
-            className="px-8"
-          >
-            <Save className="h-4 w-4" />
-            Save Changes
+          <Button type="submit" loading={saving} disabled={mismatch}>
+            <Save className="h-4 w-4" aria-hidden="true" />
+            {saving ? t("common.saving") : t("settings.save")}
           </Button>
         </div>
-      </div>
-    </div>
+      </form>
+    </Container>
+  );
+}
+
+/** Small heading row used inside the settings cards. */
+function CardTitle({ icon: Icon, title }: { icon: typeof User; title: string }) {
+  return (
+    <h2 className="flex items-center gap-2.5 font-display text-base font-semibold text-fg">
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent">
+        <Icon className="h-4 w-4" aria-hidden="true" />
+      </span>
+      {title}
+    </h2>
   );
 }

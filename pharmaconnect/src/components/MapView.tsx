@@ -4,20 +4,25 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from "react-leaflet";
 import L from "leaflet";
+import { Phone, Stethoscope } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { VerifiedBadge } from "@/components/ui/Badge";
 import { viberUrl, whatsappUrl } from "@/lib/contact";
 import { FALLBACK_CENTER, filterValidPharmacies, isValidLocation } from "@/lib/geo";
 import type { NearbyPharmacyDTO } from "@/types";
 
-// Custom professional marker for pharmacies (scales up when active)
+// Markers are DivIcons, so their colours are baked into markup rather than
+// coming from the theme. These two hues are the accent ramp in both themes.
+const PIN = "#175e4c";
+const PIN_STRONG = "#123f35";
+
 function makePharmacyIcon(active: boolean) {
   return new L.DivIcon({
     html: `
-      <div class="relative flex items-center justify-center ${active ? "scale-125 z-[999]" : ""} transition-transform">
-        <div class="absolute ${active ? "w-10 h-10 bg-primary-500/30" : "w-8 h-8 bg-primary-500/20"} rounded-full animate-ping"></div>
-        <div class="relative ${active ? "w-8 h-8" : "w-6 h-6"} ${active ? "bg-primary-500 ring-4 ring-primary-500/40" : "bg-primary-600"} rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white transition-all">
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <div class="relative flex items-center justify-center ${active ? "scale-125" : ""}" style="transition: transform 200ms cubic-bezier(0.22,1,0.36,1)">
+        <div class="absolute rounded-full" style="width:${active ? 40 : 32}px;height:${active ? 40 : 32}px;background:${PIN};opacity:0.25;animation: pcPing 2s cubic-bezier(0,0,0.2,1) infinite"></div>
+        <div class="relative rounded-full flex items-center justify-center text-white" style="width:${active ? 32 : 24}px;height:${active ? 32 : 24}px;background:${active ? PIN_STRONG : PIN};border:2px solid #fff;box-shadow:0 2px 8px rgb(20 28 26 / 0.35)">
+          <svg xmlns="http://www.w3.org/2000/svg" width="${active ? 14 : 12}" height="${active ? 14 : 12}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </div>
       </div>
     `,
@@ -32,8 +37,8 @@ const activePharmacyIcon = makePharmacyIcon(true);
 const userIcon = new L.DivIcon({
   html: `
     <div class="relative flex items-center justify-center">
-      <div class="absolute w-6 h-6 bg-blue-500/30 rounded-full animate-ping"></div>
-      <div class="relative w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-md"></div>
+      <div class="absolute rounded-full" style="width:24px;height:24px;background:#2563eb;opacity:0.28;animation: pcPing 2s cubic-bezier(0,0,0.2,1) infinite"></div>
+      <div class="relative rounded-full" style="width:16px;height:16px;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgb(20 28 26 / 0.3)"></div>
     </div>
   `,
   className: "",
@@ -154,9 +159,11 @@ export default function MapView({ userLocation, pharmacies, activePharmacyId, on
 
       {safeUserLocation && (
         <Marker position={[safeUserLocation.lat, safeUserLocation.lng]} icon={userIcon} alt="Your location">
-          <Popup className="custom-popup">
-            <div className="text-sm font-medium text-slate-900">Your Current Location</div>
-            <p className="text-xs text-slate-500">{safeUserLocation.lat.toFixed(4)}, {safeUserLocation.lng.toFixed(4)}</p>
+          <Popup>
+            <div className="font-medium">Your location</div>
+            <p className="tabular text-fg-muted">
+              {safeUserLocation.lat.toFixed(4)}, {safeUserLocation.lng.toFixed(4)}
+            </p>
           </Popup>
         </Marker>
       )}
@@ -169,66 +176,75 @@ export default function MapView({ userLocation, pharmacies, activePharmacyId, on
           alt={p.name}
           eventHandlers={{ click: () => onSelectPharmacy?.(p.id) }}
         >
-          <Popup className="custom-popup" maxWidth={240}>
-            <div className="p-1 min-w-[200px]">
-              <div className="flex items-start gap-2 mb-2">
-                <div className="p-1.5 bg-primary-100 text-primary-600 rounded-lg shrink-0 mt-0.5">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                </div>
+          <Popup maxWidth={260}>
+            <div className="min-w-[210px]">
+              <div className="mb-2 flex items-start gap-2">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
+                  <Stethoscope className="h-3.5 w-3.5" aria-hidden="true" />
+                </span>
                 <div className="min-w-0">
-                  <p className="font-bold text-slate-900 leading-tight text-sm flex items-center gap-1.5 flex-wrap">
-                    <a href={`/pharmacies/${p.id}`} className="hover:text-primary-600 hover:underline underline-offset-2">
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold leading-tight">
+                    <a
+                      href={`/pharmacies/${p.id}`}
+                      className="rounded hover:text-accent hover:underline"
+                    >
                       {p.name}
                     </a>
                     {p.verified && <VerifiedBadge />}
                   </p>
-                  <p className="text-xs text-slate-500 line-clamp-2">{p.address}</p>
+                  <p className="line-clamp-2 text-xs text-fg-muted">{p.address}</p>
                 </div>
               </div>
-              <div className="space-y-1 text-xs text-slate-600">
+
+              <div className="space-y-1 text-xs text-fg-muted">
                 <p className="flex items-center gap-1.5">
-                  <span className="opacity-60 shrink-0">📞</span>
-                  <a href={`tel:${p.phone}`} className="hover:text-primary-600 hover:underline underline-offset-2">
+                  <Phone className="h-3 w-3 shrink-0 opacity-60" aria-hidden="true" />
+                  <a
+                    href={`tel:${p.phone.replace(/[^+\d]/g, "")}`}
+                    className="rounded tabular hover:text-accent hover:underline"
+                  >
                     {p.phone}
                   </a>
                 </p>
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
-                  <span className="font-semibold text-primary-600 text-xs">
+                <div className="flex items-center justify-between gap-2 border-t border-line pt-2">
+                  <span className="text-xs font-semibold text-accent">
                     {p.quantity} units · {p.medicine.genericName}
                   </span>
-                  <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0">
-                    {p.distanceKm < 1 ? `${Math.round(p.distanceKm * 1000)} m` : `${p.distanceKm.toFixed(1)} km`}
+                  <span className="tabular shrink-0 rounded-full bg-surface-sunken px-2 py-0.5 text-[11px] font-medium">
+                    {p.distanceKm < 1
+                      ? `${Math.round(p.distanceKm * 1000)} m`
+                      : `${p.distanceKm.toFixed(1)} km`}
                   </span>
                 </div>
               </div>
-              <div className="flex gap-2 mt-3">
-                <a
-                  href={`https://www.google.com/maps/?q=${p.latitude},${p.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 text-center py-2 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
-                >
-                  View on Google Maps
-                </a>
+
+              <div className="mt-3 flex gap-2">
                 <a
                   href={`https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 text-center py-2 bg-primary-600 text-white rounded-xl text-xs font-bold hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
+                  className="flex-1 rounded-lg bg-accent px-2 py-2 text-center text-xs font-semibold text-accent-fg transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
                 >
-                  Get Directions
+                  Directions
+                </a>
+                <a
+                  href={`tel:${p.phone.replace(/[^+\d]/g, "")}`}
+                  className="flex-1 rounded-lg border border-line px-2 py-2 text-center text-xs font-semibold text-fg transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+                >
+                  Call
                 </a>
               </div>
+
               {(whatsappUrl(p.phone, p.name) || viberUrl(p.phone)) && (
-                <div className="flex gap-2 mt-2">
+                <div className="mt-2 flex gap-2">
                   {whatsappUrl(p.phone, p.name) && (
                     <a
                       href={whatsappUrl(p.phone, p.name)!}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 text-center py-2 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
+                      className="flex-1 rounded-lg border border-line px-2 py-2 text-center text-xs font-semibold text-fg transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
                     >
-                      WhatsApp — no account needed
+                      WhatsApp
                     </a>
                   )}
                   {viberUrl(p.phone) && (
@@ -236,7 +252,7 @@ export default function MapView({ userLocation, pharmacies, activePharmacyId, on
                       href={viberUrl(p.phone)!}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 text-center py-2 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
+                      className="flex-1 rounded-lg border border-line px-2 py-2 text-center text-xs font-semibold text-fg transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
                     >
                       Viber
                     </a>

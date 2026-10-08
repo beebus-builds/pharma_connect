@@ -2,6 +2,8 @@
 
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { MapPin } from "lucide-react";
+import { buttonClasses } from "@/components/ui/Button";
+import { useLocale } from "@/components/LocaleProvider";
 
 interface Props {
   children: ReactNode;
@@ -9,6 +11,22 @@ interface Props {
 
 interface State {
   hasError: boolean;
+}
+
+function MapFallback() {
+  const { t } = useLocale();
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-surface-sunken p-6 text-center">
+      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-surface-sunken text-fg-subtle ring-1 ring-line">
+        <MapPin className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <p className="text-sm font-semibold text-fg">{t("map.failed")}</p>
+      <p className="max-w-[34ch] text-xs leading-relaxed text-fg-muted">{t("map.failedBody")}</p>
+      <button type="button" className={buttonClasses({ variant: "secondary", size: "xs" })}>
+        {t("common.retry")}
+      </button>
+    </div>
+  );
 }
 
 /**
@@ -28,25 +46,7 @@ export class MapErrorBoundary extends Component<Props, State> {
   }
 
   public render() {
-    if (this.state.hasError) {
-      return (
-        <div className="h-full w-full flex flex-col items-center justify-center gap-3 bg-slate-100 dark:bg-slate-800 p-6 text-center">
-          <MapPin className="h-8 w-8 text-slate-400" aria-hidden="true" />
-          <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-            Map is unavailable right now
-          </p>
-          <p className="text-xs text-slate-500">
-            You can still use the list and send requests to pharmacies.
-          </p>
-          <button
-            onClick={() => this.setState({ hasError: false })}
-            className="text-xs font-semibold text-primary-600 hover:text-primary-700"
-          >
-            Try again
-          </button>
-        </div>
-      );
-    }
+    if (this.state.hasError) return <MapFallback />;
     return this.props.children;
   }
 }

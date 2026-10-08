@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { MapPin, Phone, Navigation, Store, ArrowLeft, PackageCheck } from "lucide-react";
+import { MapPin, Phone, Navigation, Store, ArrowLeft, PackageCheck, MessageCircle } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { haversineDistanceKm, formatDistance, stockStatus } from "@/lib/utils";
@@ -11,8 +11,11 @@ import { isValidLatLng } from "@/lib/geo";
 import { effectiveThreshold, isExpired } from "@/lib/inventory";
 import { effectivePlan } from "@/lib/plans";
 import { viberUrl, whatsappUrl } from "@/lib/contact";
+import { getSiteUrl } from "@/lib/seo";
 import { VerifiedBadge } from "@/components/ui/Badge";
 import { StatTile } from "@/components/ui/StatTile";
+import { buttonClasses } from "@/components/ui/Button";
+import { Container } from "@/components/ui/Container";
 import ShareButtons from "@/components/ShareButtons";
 import StorefrontProducts from "./StorefrontProducts";
 import type { PharmacyStorefrontDTO } from "@/types";
@@ -87,7 +90,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const storefront = await getStorefront(id);
   if (!storefront) return { title: "Pharmacy not found — PharmaConnect" };
-  const canonical = `${(process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "")}/pharmacies/${storefront.id}`;
+  const canonical = `${getSiteUrl()}/pharmacies/${storefront.id}`;
   const description = `Browse ${storefront.inStockCount} in-stock medicines at ${storefront.name}, ${storefront.address}. Request stock and chat directly.`;
   return {
     title: `${storefront.name} — products & stock | PharmaConnect`,
@@ -130,101 +133,138 @@ export default async function PharmacyStorefrontPage({ params, searchParams }: P
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${storefront.latitude},${storefront.longitude}`;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 animate-fadeIn">
+    <Container className="py-8">
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 mb-4"
+        className="mb-5 inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to search
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Back to search
       </Link>
 
       {/* Cover */}
-      <div className="relative h-44 sm:h-56 rounded-3xl overflow-hidden bg-gradient-to-br from-primary-700 via-primary-600 to-teal-600 border border-slate-200 dark:border-slate-800">
-        {storefront.coverImageUrl && (
+      <div className="relative h-40 overflow-hidden rounded-3xl border border-line bg-accent-soft sm:h-52">
+        {storefront.coverImageUrl ? (
           <Image
             src={storefront.coverImageUrl}
-            alt={`${storefront.name} storefront`}
+            alt=""
             fill
             className="object-cover"
             sizes="(max-width: 896px) 100vw, 896px"
             priority
           />
+        ) : (
+          // No photo on file: a calm brand-tinted panel beats a broken image.
+          <div className="mesh absolute inset-0" aria-hidden="true" />
         )}
       </div>
 
       {/* Profile header */}
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-10 px-2 sm:px-4">
-        <div className="relative h-20 w-20 sm:h-24 sm:w-24 rounded-2xl overflow-hidden bg-white dark:bg-slate-800 border-4 border-white dark:border-slate-900 shadow-lg shrink-0 flex items-center justify-center">
+      <div className="-mt-10 flex flex-col gap-4 px-1 sm:flex-row sm:items-end sm:px-4">
+        <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-canvas bg-surface shadow-card sm:h-24 sm:w-24">
           {storefront.profileImageUrl ? (
             <Image
               src={storefront.profileImageUrl}
-              alt={storefront.name}
+              alt=""
               fill
               className="object-cover"
               sizes="96px"
             />
           ) : (
-            <Store className="h-8 w-8 text-primary-600" aria-hidden="true" />
+            <Store className="h-8 w-8 text-accent" aria-hidden="true" />
           )}
         </div>
-        <div className="min-w-0 flex-1 pt-1 sm:pb-1">
-          <h1 className="headline font-display text-2xl sm:text-3xl flex items-center gap-2 flex-wrap">
+        <div className="min-w-0 flex-1 sm:pb-1">
+          <h1 className="headline flex flex-wrap items-center gap-2 font-display text-2xl text-fg sm:text-3xl">
             {storefront.name}
             {storefront.verified && <VerifiedBadge />}
           </h1>
-          <p className="text-sm text-stone-500 dark:text-slate-400 flex items-start gap-1.5 mt-1.5">
-            <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-            {storefront.address}
-            {storefront.distanceKm !== null && (
-              <span className="font-semibold text-primary-700 dark:text-primary-300 ml-1">
-                · {formatDistance(storefront.distanceKm)} away
-              </span>
-            )}
+          <p className="mt-1.5 flex items-start gap-1.5 text-sm text-fg-muted">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="min-w-0">
+              {storefront.address}
+              {storefront.distanceKm !== null && (
+                <span className="ml-1 font-semibold text-accent">
+                  · {formatDistance(storefront.distanceKm)} away
+                </span>
+              )}
+            </span>
           </p>
         </div>
       </div>
 
       {/* At a glance — the three numbers a patient actually decides on */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-4 mt-6">
+      <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
         <StatTile
           icon={PackageCheck}
           label="In stock now"
           value={storefront.inStockCount}
           tone={storefront.inStockCount > 0 ? "positive" : "neutral"}
         />
-        <StatTile icon={Store} label="Branches" value={storefront.branches.length} tone="neutral" />
+        <StatTile
+          icon={Store}
+          label="Branches"
+          value={storefront.branches.length}
+          tone="neutral"
+        />
         <StatTile
           icon={MapPin}
           label={storefront.distanceKm !== null ? "Distance" : "Location"}
-          value={storefront.distanceKm !== null ? `${storefront.distanceKm.toFixed(1)}` : "—"}
-          caption={storefront.distanceKm !== null ? "km from you" : "Exact pin on map"}
+          // No `?lat/lng`: say so rather than rendering an em-dash that reads
+          // like a measurement of zero.
+          value={storefront.distanceKm !== null ? storefront.distanceKm.toFixed(1) : "Pinned"}
+          caption={
+            storefront.distanceKm !== null ? "km from you" : "Exact point on the map"
+          }
           tone="neutral"
         />
       </div>
 
-      {/* Actions — Call is the primary intent on a storefront */}
-      <div className="flex flex-wrap gap-2 mt-5">
+      {/* Branches — the count above is a promise; this is the payoff. */}
+      {storefront.branches.length > 1 && (
+        <ul className="mt-5 grid gap-2 sm:grid-cols-2">
+          {storefront.branches.map((branch) => (
+            <li
+              key={branch.id}
+              className="flex items-start gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2.5"
+            >
+              <Store className="mt-0.5 h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-fg">{branch.name}</p>
+                <p className="truncate text-xs text-fg-muted">{branch.address}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Actions — calling is the primary intent on a storefront */}
+      <div className="mt-5 flex flex-wrap items-center gap-2">
         <a
-          href={`tel:${storefront.phone}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl bg-primary-700 hover:bg-primary-800 text-white shadow-sm transition-colors"
+          href={`tel:${storefront.phone.replace(/[^+\d]/g, "")}`}
+          className={buttonClasses({ size: "sm" })}
+          aria-label={`Call ${storefront.name} at ${storefront.phone}`}
         >
-          <Phone className="h-3.5 w-3.5" /> Call {storefront.phone}
+          <Phone className="h-3.5 w-3.5" aria-hidden="true" />
+          Call {storefront.phone}
         </a>
         <a
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl bg-white hover:bg-stone-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-stone-200 dark:border-slate-700 transition-colors"
+          className={buttonClasses({ size: "sm", variant: "secondary" })}
         >
-          <Navigation className="h-3.5 w-3.5" /> Directions
+          <Navigation className="h-3.5 w-3.5" aria-hidden="true" />
+          Directions
         </a>
         {waLink && (
           <a
             href={waLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl bg-white hover:bg-stone-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-stone-200 dark:border-slate-700 transition-colors"
+            className={buttonClasses({ size: "sm", variant: "secondary" })}
           >
+            <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" aria-hidden="true" />
             WhatsApp
           </a>
         )}
@@ -233,21 +273,22 @@ export default async function PharmacyStorefrontPage({ params, searchParams }: P
             href={viberUrl(storefront.phone)!}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl bg-white hover:bg-stone-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-stone-200 dark:border-slate-700 transition-colors"
+            className={buttonClasses({ size: "sm", variant: "secondary" })}
           >
+            <Phone className="h-3.5 w-3.5 text-[#7360F2]" aria-hidden="true" />
             Viber
           </a>
         )}
         <ShareButtons
-          url={`${(process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "")}/pharmacies/${storefront.id}`}
+          url={`${getSiteUrl()}/pharmacies/${storefront.id}`}
           title={`${storefront.name} on PharmaConnect`}
         />
       </div>
 
       {/* Products listed under this pharmacy's name */}
-      <div className="mt-8">
+      <div className="mt-9">
         <StorefrontProducts pharmacy={storefront} canRequest={canRequest} />
       </div>
-    </div>
+    </Container>
   );
 }

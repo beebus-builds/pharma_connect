@@ -1,136 +1,231 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, MapPin, Search } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import {
+  Search,
+  MessageCircle,
+  BadgeCheck,
+  ShieldCheck,
+  Store,
+  Users,
+  PackageSearch,
+  ArrowRight,
+} from "lucide-react";
+import { Container, Section } from "@/components/ui/Container";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Card } from "@/components/ui/Card";
+import { buttonClasses } from "@/components/ui/Button";
+import { Accordion, Alert } from "@/components/ui/Feedback";
+import { Reveal } from "@/components/ui/Reveal";
+import { PlanGrid } from "@/components/PlanGrid";
 import { useLocale } from "@/components/LocaleProvider";
 import type { MessageKey } from "@/lib/i18n";
 
-const FAQ_KEYS = ["details.faq1", "details.faq2", "details.faq3", "details.faq4"] as const;
-
-const STEPS: { step: string; title: MessageKey; desc: MessageKey; icon: React.ReactNode }[] = [
-  {
-    step: "01",
-    title: "details.step1.title",
-    desc: "details.step1.desc",
-    icon: <Search className="h-8 w-8" />,
-  },
-  {
-    step: "02",
-    title: "details.step2.title",
-    desc: "details.step2.desc",
-    icon: <MapPin className="h-8 w-8" />,
-  },
-  {
-    step: "03",
-    title: "details.step3.title",
-    desc: "details.step3.desc",
-    icon: <CheckCircle2 className="h-8 w-8" />,
-  },
+const PATIENT_STEPS: { title: MessageKey; desc: MessageKey; icon: typeof Search }[] = [
+  { title: "details.step1.title", desc: "details.step1.desc", icon: Search },
+  { title: "details.step2.title", desc: "details.step2.desc", icon: Store },
+  { title: "details.step3.title", desc: "details.step3.desc", icon: MessageCircle },
 ];
+
+const PHARMACY_STEPS: { title: MessageKey; desc: MessageKey; icon: typeof Search }[] = [
+  { title: "details.pharm1.title", desc: "details.pharm1.desc", icon: Store },
+  { title: "details.pharm2.title", desc: "details.pharm2.desc", icon: PackageSearch },
+  { title: "details.pharm3.title", desc: "details.pharm3.desc", icon: BadgeCheck },
+];
+
+const TRUST_POINTS: { icon: typeof ShieldCheck; title: MessageKey; body: MessageKey }[] = [
+  { icon: BadgeCheck, title: "trust.verifiedTitle", body: "trust.verifiedBody" },
+  { icon: ShieldCheck, title: "trust.reportTitle", body: "trust.reportBody" },
+  { icon: Users, title: "trust.freeTitle", body: "trust.freeBody" },
+];
+
+const FAQ_KEYS = ["details.faq1", "details.faq2", "details.faq3", "details.faq4", "details.faq5"] as const;
+
+/** One step list, rendered once for each audience. */
+function Steps({
+  steps,
+  label,
+}: {
+  steps: { title: MessageKey; desc: MessageKey; icon: typeof Search }[];
+  label: string;
+}) {
+  const { t } = useLocale();
+  return (
+    <div>
+      <h3 className="font-display text-lg font-semibold text-fg">{label}</h3>
+      <ol className="mt-5 space-y-5">
+        {steps.map(({ title, desc, icon: Icon }, index) => (
+          <li key={title} className="flex gap-4">
+            <div className="relative flex flex-col items-center">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent ring-1 ring-inset ring-accent/15">
+                <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+              </span>
+              {index < steps.length - 1 && (
+                <span className="mt-1 w-px flex-1 bg-line" aria-hidden="true" />
+              )}
+            </div>
+            <div className="min-w-0 pb-1">
+              <p className="flex items-baseline gap-2 text-[0.9375rem] font-semibold text-fg">
+                <span className="tabular font-display text-xs text-fg-subtle">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                {t(title)}
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-fg-muted">{t(desc)}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 export default function HomepageDetails() {
   const { t } = useLocale();
 
   return (
     <>
-      <section className="bg-primary-900 text-white py-24 overflow-hidden relative">
-        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white rounded-full blur-[120px]" />
-        </div>
-        <div className="max-w-6xl mx-auto px-4 relative z-10">
-          <div className="text-center mb-20">
-            <h2 className="text-4xl font-black mb-4 animate-fadeIn motion-reduce:animate-none">{t("details.title")}</h2>
-            <p className="text-primary-200 max-w-2xl mx-auto text-lg animate-fadeIn motion-reduce:animate-none">
-              {t("details.subtitle")}
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-16 relative">
-            <div className="hidden md:block absolute top-16 left-0 w-full h-1 bg-white/10 z-0" />
-            {STEPS.map((step, index) => (
-              <div
-                key={step.step}
-                className="text-center relative z-10 group animate-fadeIn motion-reduce:animate-none"
-                style={{ animationDelay: `${index * 200}ms` }}
-              >
-                <div className="relative inline-block mb-8">
-                  <div className="absolute -top-6 -left-6 text-6xl font-black text-white/10 group-hover:text-white/20 transition">{step.step}</div>
-                  <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center backdrop-blur-xl border border-white/20 group-hover:bg-white group-hover:text-primary-700 transition-all duration-500 shadow-2xl">
-                    {step.icon}
+      {/* --------------------------------------------------------- Trust band */}
+      <Section className="border-y border-line bg-surface-sunken">
+        <Container>
+          <Reveal>
+            <SectionHeading
+              eyebrow={t("trust.eyebrow")}
+              title={t("trust.title")}
+              description={t("trust.subtitle")}
+              align="center"
+            />
+          </Reveal>
+          <div className="mt-10 grid gap-4 sm:grid-cols-3">
+            {TRUST_POINTS.map(({ icon: Icon, title, body }, i) => (
+              <Reveal key={title} delay={i * 0.07} className="h-full">
+                <Card className="h-full p-5" variant="default">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
+                    <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
                   </div>
-                </div>
-                <h3 className="text-2xl font-bold mb-3">{t(step.title)}</h3>
-                <p className="text-primary-100 text-base leading-relaxed opacity-80">{t(step.desc)}</p>
-              </div>
+                  <h3 className="mt-4 font-display text-base font-semibold text-fg">{t(title)}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{t(body)}</p>
+                </Card>
+              </Reveal>
             ))}
           </div>
-          <div className="mt-20 text-center">
-            <Link href="/how-it-works">
-              <Button variant="secondary" className="px-10 py-6 rounded-full text-lg font-bold shadow-xl hover:scale-105 transition">
-                {t("details.guide")}
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+        </Container>
+      </Section>
 
-      <section className="bg-slate-100 dark:bg-slate-900/50 py-24">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-black mb-4 animate-fadeIn motion-reduce:animate-none">{t("details.faqTitle")}</h2>
-            <p className="text-slate-500 text-lg animate-fadeIn motion-reduce:animate-none">{t("details.faqSubtitle")}</p>
-          </div>
-          <div className="space-y-4">
-            {FAQ_KEYS.map((key, index) => {
-              const q = t(`${key}.q` as MessageKey);
-              return (
-                <div
-                  key={key}
-                  className="group animate-fadeIn motion-reduce:animate-none"
-                  style={{ animationDelay: `${index * 100}ms` }}
+      {/* ------------------------------------------------------------- Steps */}
+      <Section>
+        <Container>
+          <Reveal>
+            <SectionHeading
+              eyebrow={t("details.title")}
+              title={t("details.subtitle")}
+              description={t("details.description")}
+            />
+          </Reveal>
+          <div className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-16">
+            <Reveal delay={0.05} className="h-full">
+              <Card className="h-full p-6 sm:p-8">
+                <Steps steps={PATIENT_STEPS} label={t("details.forPatients")} />
+                <Link href="/login" className={`${buttonClasses({ block: true })} mt-7`}>
+                  {t("details.patientCta")}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Card>
+            </Reveal>
+            <Reveal delay={0.12} className="h-full">
+              <Card className="h-full p-6 sm:p-8">
+                <Steps steps={PHARMACY_STEPS} label={t("details.forPharmacies")} />
+                <Link
+                  href="/register"
+                  className={`${buttonClasses({ variant: "secondary", block: true })} mt-7`}
                 >
-                  <Card className="p-6 border-none shadow-sm bg-white dark:bg-slate-900 hover:shadow-md transition-all duration-300 overflow-hidden relative">
-                    <div className="flex items-start justify-between gap-4">
-                      <h4 className="font-bold text-lg pr-4">{q}</h4>
-                      <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-primary-600 transition-colors" />
-                    </div>
-                    <p className="text-slate-500 mt-4 leading-relaxed text-sm">{t(`${key}.a` as MessageKey)}</p>
-                    <div className="absolute bottom-0 left-0 h-1 w-0 bg-primary-600 group-hover:w-full transition-all duration-500" />
-                  </Card>
-                </div>
-              );
-            })}
+                  {t("details.pharmacyCta")}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Card>
+            </Reveal>
           </div>
-        </div>
-      </section>
+        </Container>
+      </Section>
 
-      <section className="max-w-6xl mx-auto px-4 w-full pb-20">
-        <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-blue-800 rounded-[3rem] p-12 md:p-20 text-center text-white relative overflow-hidden shadow-2xl">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-48 -mt-48" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl -ml-48 -mb-48" />
-          <div className="relative z-10">
-            <h2 className="text-4xl sm:text-6xl font-black mb-8 leading-tight animate-scaleIn motion-reduce:animate-none">
-              {t("details.ctaLine1")} <br />{t("details.ctaLine2")}
-            </h2>
-            <p className="text-primary-100 max-w-2xl mx-auto mb-12 text-xl opacity-90 animate-fadeIn motion-reduce:animate-none">
-              {t("details.ctaBody")}
-            </p>
-            <div className="flex flex-wrap justify-center gap-6">
-              <Link href="/">
-                <Button variant="secondary" className="px-10 py-7 text-lg font-black rounded-full shadow-xl hover:scale-105 transition">
-                  {t("details.findNow")}
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button variant="outline" className="px-10 py-7 text-lg font-black rounded-full bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm transition hover:scale-105">
-                  {t("details.joinPharmacy")}
-                </Button>
-              </Link>
+      {/* ---------------------------------------------------------- Pharmacy */}
+      <Section className="border-y border-line bg-surface-sunken">
+        <Container>
+          <Reveal>
+            <SectionHeading
+              eyebrow={t("plans.eyebrow")}
+              title={t("plans.title")}
+              description={t("plans.subtitle")}
+              align="center"
+            />
+          </Reveal>
+          <Reveal className="mt-10">
+            <PlanGrid />
+          </Reveal>
+          <Reveal>
+            <p className="mt-6 text-center text-xs text-fg-subtle">{t("plans.footnote")}</p>
+          </Reveal>
+        </Container>
+      </Section>
+
+      {/* --------------------------------------------------------------- FAQ */}
+      <Section id="faq" className="scroll-mt-24">
+        <Container className="max-w-3xl">
+          <Reveal>
+            <SectionHeading
+              eyebrow={t("details.faqTitle")}
+              title={t("details.faqSubtitle")}
+              align="center"
+              className="mb-8"
+            />
+            <Accordion
+              items={FAQ_KEYS.map((key) => ({
+                id: key,
+                question: t(`${key}.q` as MessageKey),
+                answer: t(`${key}.a` as MessageKey),
+              }))}
+            />
+
+            <Alert tone="warning" className="mt-6" title={t("details.disclaimerTitle")}>
+              {t("details.disclaimerBody")}
+            </Alert>
+          </Reveal>
+        </Container>
+      </Section>
+
+      {/* --------------------------------------------------------------- CTA */}
+      <Section className="border-t border-line">
+        <Container>
+          <Reveal>
+            <div className="relative overflow-hidden rounded-3xl bg-surface-inverse px-6 py-14 text-center text-fg-inverse sm:px-12 sm:py-20">
+              <div className="mesh pointer-events-none absolute inset-0 opacity-70" aria-hidden="true" />
+              <div className="relative">
+                <h2 className="headline text-display font-display">
+                  {t("details.ctaLine1")} {t("details.ctaLine2")}
+                </h2>
+                <p className="lede mx-auto mt-4 max-w-xl text-sm opacity-80 sm:text-base">
+                  {t("details.ctaBody")}
+                </p>
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                  <Link href="/" className={buttonClasses({ variant: "secondary", size: "lg" })}>
+                    {t("details.findNow")}
+                  </Link>
+                  <Link
+                    href="/register"
+                    className={buttonClasses({
+                      size: "lg",
+                      className:
+                        "bg-white/10 text-white ring-1 ring-inset ring-white/25 hover:bg-white/20",
+                    })}
+                  >
+                    {t("details.joinPharmacy")}
+                  </Link>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </section>
+          </Reveal>
+        </Container>
+      </Section>
     </>
   );
 }
