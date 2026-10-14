@@ -993,6 +993,56 @@ const en = {
   "footer.trust": "Trust",
   "footer.emergencyInfo": "Emergency info",
   "footer.helpCenter": "Help center",
+
+  // Essential medicines page.
+  "ess.badge": "Reference",
+  "ess.title": "Essential medicines",
+  "ess.subtitle":
+    "A practical essential-medicines reference for Nepal households and pharmacies. Information only; not medical advice.",
+  "ess.intro":
+    "Below are medicines commonly needed for day-to-day health, aligned with the WHO Model List of Essential Medicines. {count} medicines currently appear in our catalog, so you can check availability near you.",
+  "ess.notMedical":
+    "This is a reference, not a prescription. Medicines require a clinician’s judgement. Follow doses and contraindications from a pharmacist or doctor.",
+  "ess.group.fever": "Fever and pain",
+  "ess.group.infection": "Infections and antimicrobials",
+  "ess.group.hydration": "Diarrhoea and dehydration",
+  "ess.group.allergy": "Allergy and cold",
+  "ess.group.stomach": "Stomach and digestion",
+  "ess.group.chronic": "Chronic and long-term care",
+  "ess.group.vitamins": "Vitamins and minerals",
+  "ess.group.skin": "Skin, wounds and eye care",
+  "ess.ctaTitle": "Check availability near you",
+  "ess.ctaBody": "Pick a medicine and see which pharmacies have it in stock.",
+
+  // Network insights (aggregated, anonymous).
+  "insights.badge": "Insights",
+  "insights.title": "Network insights",
+  "insights.subtitle": "Aggregated, privacy-safe statistics about the PharmaConnect network.",
+  "insights.statsEyebrow": "Network at a glance",
+  "insights.statsTitle": "The network at a glance",
+  "insights.statsSubtitle": "Counts across all pharmacies, medicines and requests.",
+  "insights.statsNote":
+    "Counts are updated on each page view. No individual patient or pharmacy is identified.",
+  "insights.verifiedPharmacies": "Verified pharmacies",
+  "insights.totalPharmacies": "Total pharmacies",
+  "insights.catalogMedicines": "Medicines in catalog",
+  "insights.stockBatches": "Stock entries",
+  "insights.registeredUsers": "Registered users",
+  "insights.patients": "Patients",
+  "insights.requests": "Availability requests",
+  "insights.openReports": "Open reports",
+  "insights.coverageEyebrow": "Geography",
+  "insights.coverageTitle": "Verified pharmacies by area",
+  "insights.coverageSubtitle": "Where trusted counters are available.",
+  "insights.coverageEmpty": "No verified pharmacies yet. Coverage will appear here.",
+  "insights.demandEyebrow": "Demand",
+  "insights.demandTitle": "Most requested medicines",
+  "insights.demandSubtitle": "The medicines patients ask about most. Anonymous, aggregate.",
+  "insights.demandEmpty": "No requests recorded yet.",
+  "insights.demandNote": "Denominator is total availability requests. Brand names are never shown.",
+  "insights.privacyNote":
+    "All figures are aggregate counts. We never publish personal data, pharmacy-level trade secrets, or individual patient interest.",
+
 } as const;
 
 export type MessageKey = keyof typeof en;

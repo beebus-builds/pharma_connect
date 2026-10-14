@@ -16,6 +16,8 @@ const STATIC_ROUTES = [
   "/trust",
   "/emergency",
   "/help",
+  "/essential-medicines",
+  "/insights",
   "/privacy",
   "/terms",
 ];
