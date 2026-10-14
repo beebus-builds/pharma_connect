@@ -203,6 +203,18 @@ export default function Footer() {
             >
               {t("nav.safety")}
             </Link>
+            <Link
+              href="/trust"
+              className="rounded transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+            >
+              {t("footer.trust")}
+            </Link>
+            <Link
+              href="/help"
+              className="rounded transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+            >
+              {t("footer.helpCenter")}
+            </Link>
             <a
               href="mailto:support@pharmaconnect.com.np"
               className="inline-flex items-center gap-1.5 rounded transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"

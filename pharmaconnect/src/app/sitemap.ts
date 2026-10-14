@@ -13,6 +13,9 @@ const STATIC_ROUTES = [
   "/for-pharmacies",
   "/pricing",
   "/safety",
+  "/trust",
+  "/emergency",
+  "/help",
   "/privacy",
   "/terms",
 ];
